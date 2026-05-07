@@ -32,6 +32,7 @@ module Api
             rows = PvpLeaderboardEntrySnapshot
               .joins(:pvp_leaderboard)
               .where(character_id: character.id)
+              .where(pvp_leaderboards: { pvp_season_id: current_season.id })
               .where("snapshot_at >= ?", WINDOW.ago)
               .order("pvp_leaderboards.bracket ASC, pvp_leaderboard_entry_snapshots.snapshot_at ASC")
               .pluck("pvp_leaderboards.bracket",

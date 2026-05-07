@@ -159,6 +159,15 @@ module Pvp
         def write_snapshots(entry_records, leaderboard)
           return if entry_records.blank?
 
+          # Read spec_id from the just-upserted entries — for mixed brackets
+          # (2v2/3v3/rbg) entry_records carry no :spec_id, but the persisted entry
+          # may have one populated by an earlier SyncCharacterService run.
+          char_ids = entry_records.map { |r| r[:character_id] }
+          spec_ids = PvpLeaderboardEntry
+            .where(pvp_leaderboard_id: leaderboard.id, character_id: char_ids)
+            .pluck(:character_id, :spec_id)
+            .to_h
+
           rows = entry_records.map do |r|
             {
               character_id:       r[:character_id],
@@ -169,7 +178,7 @@ module Pvp
               rating:             r[:rating],
               wins:               r[:wins],
               losses:             r[:losses],
-              spec_id:            r[:spec_id],
+              spec_id:            spec_ids[r[:character_id]],
               created_at:         Time.current,
               updated_at:         Time.current
             }
