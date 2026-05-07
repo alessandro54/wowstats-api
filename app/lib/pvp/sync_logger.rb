@@ -50,6 +50,14 @@ module Pvp
       )
     end
 
+    # ── Phase 1b — Snapshot insertion ────────────────────────────────────────
+
+    def self.snapshots_inserted(count:, leaderboard:)
+      logger.info(
+        "  [snapshot] #{leaderboard.region}/#{leaderboard.bracket}: snapshots inserted=#{count}"
+      )
+    end
+
     # ── Phase 2 — Character batch sync ───────────────────────────────────────
 
     # rubocop:disable Metrics/AbcSize
