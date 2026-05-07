@@ -25,17 +25,9 @@ class PvpLeaderboard < ApplicationRecord
 
   has_many :entries, class_name: "PvpLeaderboardEntry", dependent: :destroy
 
-  OVERALL_BRACKETS = {
-    "blitz-overall" => "blitz-%",
-    "shuffle-overall" => "shuffle-%"
-  }.freeze
+  OVERALL_BRACKETS = Pvp::BracketResolver::AGGREGATES
 
-  # Resolves "blitz-overall" / "shuffle-overall" to all per-spec brackets,
-  # or matches a single bracket exactly.
-  scope :for_bracket, ->(bracket) {
-    pattern = OVERALL_BRACKETS[bracket]
-    pattern ? where("bracket LIKE ?", pattern) : where(bracket: bracket)
-  }
+  scope :for_bracket, ->(bracket) { Pvp::BracketResolver.scope(self, bracket) }
 
   def get_top_n(n, spec_id: nil)
     scope = entries

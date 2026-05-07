@@ -14,10 +14,11 @@ module Pvp
         char_ids = batch.pluck(:id)
         CharacterTalent.where(character_id: char_ids).delete_all
         CharacterItem.where(character_id: char_ids).delete_all
+        Character.where(id: char_ids).delete_all
         total_purged += char_ids.size
       end
 
-      Rails.logger.info("[PurgeStaleCharacterDataJob] Purged data for #{total_purged} stale characters")
+      Rails.logger.info("[PurgeStaleCharacterDataJob] Purged #{total_purged} stale characters")
     end
   end
 end

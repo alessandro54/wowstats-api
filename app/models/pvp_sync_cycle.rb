@@ -87,14 +87,29 @@ class PvpSyncCycle < ApplicationRecord
       milestone = crossed_milestone
       return unless milestone
 
-      Pvp::NotifyCycleProgressJob.perform_later(
-        id,
-        milestone,
-        completed_batches: completed_character_batches,
-        expected_batches:  expected_character_batches,
-        elapsed_seconds:   (Time.current - created_at).round,
-        eta_seconds_snap:  eta_seconds&.round
-      )
+      TelegramNotifier.send(progress_milestone_message(milestone))
+    end
+
+    def progress_milestone_message(milestone)
+      elapsed_secs = (Time.current - created_at).round
+      eta_raw      = eta_seconds&.round
+      eta_str      = eta_raw ? " · ETA #{format_elapsed(eta_raw)}" : ""
+      season_name  = pvp_season&.display_name || "Season #{pvp_season_id}"
+
+      "⏳ <b>Cycle ##{id} — #{milestone}% complete</b>\n" \
+      "#{season_name} · Regions: #{regions.join(', ')}\n" \
+      "#{completed_character_batches}/#{expected_character_batches} batches" \
+      " · #{format_elapsed(elapsed_secs)} elapsed#{eta_str}"
+    end
+
+    def format_elapsed(seconds)
+      seconds = seconds.abs
+      return "#{seconds.round}s" if seconds < 60
+      return "#{(seconds / 60).floor}m #{(seconds % 60).round}s" if seconds < 3600
+
+      h = (seconds / 3600).floor
+      m = ((seconds % 3600) / 60).round
+      "#{h}h #{m}m"
     end
 
     def crossed_milestone

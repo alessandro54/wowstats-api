@@ -24,7 +24,7 @@ RSpec.describe "GET /api/v1/pvp/meta/talents", type: :request do
 
     it "returns high confidence when total_players >= 100 and stale_count == 0" do
       # Stub count_raw_players to return 100 without needing full leaderboard setup
-      allow_any_instance_of(Api::V1::Pvp::Meta::TalentsController)
+      allow_any_instance_of(Pvp::Meta::TalentsResponseService)
         .to receive(:count_raw_players).and_return(100)
 
       get_talents
@@ -44,7 +44,7 @@ RSpec.describe "GET /api/v1/pvp/meta/talents", type: :request do
     end
 
     it "returns low confidence when total_players < 30" do
-      allow_any_instance_of(Api::V1::Pvp::Meta::TalentsController)
+      allow_any_instance_of(Pvp::Meta::TalentsResponseService)
         .to receive(:count_raw_players).and_return(5)
 
       get_talents
@@ -55,27 +55,25 @@ RSpec.describe "GET /api/v1/pvp/meta/talents", type: :request do
     end
   end
 
-  describe "compute_confidence thresholds" do
-    subject(:controller) { Api::V1::Pvp::Meta::TalentsController.new }
-
+  describe "Pvp::Meta::ConfidenceScore" do
     it "returns high when total_players >= 100 and stale_count == 0" do
-      expect(controller.send(:compute_confidence, 100, 0)).to eq("high")
+      expect(Pvp::Meta::ConfidenceScore.for(total_players: 100, stale_count: 0)).to eq("high")
     end
 
     it "returns medium when total_players >= 30 and stale_count <= 5" do
-      expect(controller.send(:compute_confidence, 30, 5)).to eq("medium")
+      expect(Pvp::Meta::ConfidenceScore.for(total_players: 30, stale_count: 5)).to eq("medium")
     end
 
     it "returns low when total_players < 30" do
-      expect(controller.send(:compute_confidence, 29, 0)).to eq("low")
+      expect(Pvp::Meta::ConfidenceScore.for(total_players: 29, stale_count: 0)).to eq("low")
     end
 
     it "returns low when stale_count > 5 even with enough players" do
-      expect(controller.send(:compute_confidence, 50, 6)).to eq("low")
+      expect(Pvp::Meta::ConfidenceScore.for(total_players: 50, stale_count: 6)).to eq("low")
     end
 
     it "returns low when total_players < 30 regardless of stale_count" do
-      expect(controller.send(:compute_confidence, 29, 0)).to eq("low")
+      expect(Pvp::Meta::ConfidenceScore.for(total_players: 29, stale_count: 99)).to eq("low")
     end
   end
 end

@@ -1,11 +1,12 @@
 module Blizzard
-  # Thread-safe dual token bucket rate limiter, one instance per Blizzard credential.
+  # Thread-safe dual token bucket rate limiter, one instance per credential+region pair.
   # Enforces both Blizzard API limits simultaneously:
   #   - Per-second:  100 req/s hard limit  → 429 if exceeded
   #   - Per-hour:  36,000 req/hr soft limit → degraded service if exceeded
   #
-  # Each OAuth client_id has its own independent buckets, so N credentials
-  # give N × 100 req/s burst and N × 36,000 req/hr sustained throughput.
+  # Blizzard enforces limits per-credential per-region (us/eu have independent quotas).
+  # Keying by "client_id:region" gives each region its own bucket, so N credentials
+  # give N × 2 × 36,000 req/hr total across both regions.
   #
   # Usage (automatic via Client#get — no manual calls needed):
   #   RateLimiter.for_credential(auth.client_id).acquire

@@ -32,8 +32,7 @@ module Pvp
             usage_count:    record.usage_count,
             usage_pct:      record.usage_pct.to_f,
             prev_usage_pct: record.prev_usage_pct&.to_f,
-            trend:          TrendClassifier.call(record.usage_pct, record.prev_usage_pct),
-            snapshot_at:    record.snapshot_at
+            trend:          TrendClassifier.call(record.usage_pct, record.prev_usage_pct)
           }
         end
 

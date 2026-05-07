@@ -6,13 +6,10 @@ module Api
           before_action :validate_show_params!, only: :show
 
           def show
-            season, bracket, region, role, model = parse_distribution_params
-            cache_key = meta_cache_key("class_distribution", model, season.blizzard_id, bracket, region, role)
-            json = meta_cache_fetch(cache_key) do
-              build_distribution_response(season, bracket, region, role, model)
+            season, bracket, region, role = parse_distribution_params
+            serve_meta("class_distribution", season.blizzard_id, bracket, region, role) do
+              build_distribution_response(season, bracket, region, role)
             end
-            render json: json
-            set_cache_headers
           end
 
           private
@@ -24,8 +21,7 @@ module Api
               region = validate_region(region == "all" ? nil : region)
               role = params.fetch(:role, "dps")
               role = role == "all" ? nil : validate_role(role)
-              model = params[:new_model] == "true" ? :bayesian : :legacy
-              [ season, bracket, region, role, model ]
+              [ season, bracket, region, role ]
             end
 
             def fetch_season
@@ -34,11 +30,18 @@ module Api
               current_season
             end
 
-            def build_distribution_response(season, bracket, region, role, model)
-              service_class = model == :bayesian ?
-                ::Pvp::Meta::BayesianClassDistributionService :
-                ::Pvp::Meta::ClassDistributionService
-              distribution = service_class.new(role:, season:, bracket:, region:).call
+            def build_distribution_response(season, bracket, region, role)
+              distribution = ::Pvp::Meta::BayesianClassDistributionService
+                .new(role:, season:, bracket:, region:).call
+
+              distribution = ::Pvp::Meta::RankChangeService.new(
+                distribution: distribution,
+                season:       season,
+                bracket:      bracket,
+                region:       region,
+                role:         role
+              ).call.payload
+
               {
                 season_id:     season.blizzard_id,
                 bracket:,

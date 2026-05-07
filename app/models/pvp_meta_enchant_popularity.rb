@@ -36,9 +36,8 @@ class PvpMetaEnchantPopularity < ApplicationRecord
   include MetaPopularityScopes
 
   self.table_name = "pvp_meta_enchant_popularity"
+  self.meta_includes = { enchantment: :translations }
 
   belongs_to :pvp_season
   belongs_to :enchantment
-
-  meta_includes_for(enchantment: :translations)
 end

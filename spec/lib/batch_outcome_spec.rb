@@ -90,11 +90,19 @@ RSpec.describe BatchOutcome do
       message = outcome.summary_message(job_label: "TestJob")
 
       expect(message).to include("[TestJob]")
-      expect(message).to include("2/3 succeeded")
-      expect(message).to include("1 failed")
-      expect(message).to include("applied_fresh_snapshot: 1")
-      expect(message).to include("reused_snapshot: 1")
-      expect(message).to include("api_error: 1")
+      expect(message).to include("2/3 ok")
+      expect(message).to include("failed=1")
+      expect(message).to include("applied_fresh_snapshot=1")
+      expect(message).to include("reused_snapshot=1")
+      expect(message).to include("api_error=1")
+    end
+
+    it "includes cycle and region context when provided" do
+      outcome.record_success(id: 1, status: :synced)
+
+      message = outcome.summary_message(job_label: "TestJob", cycle_id: 42, region: "us")
+
+      expect(message).to include("[cycle=42 region=us]")
     end
 
     it "includes failure details when failures exist" do
@@ -103,7 +111,7 @@ RSpec.describe BatchOutcome do
 
       message = outcome.summary_message(job_label: "TestJob")
 
-      expect(message).to include("Failures: [42: timeout]")
+      expect(message).to include("char=42 err=timeout")
     end
 
     it "omits failure details when all items succeeded" do
@@ -111,7 +119,7 @@ RSpec.describe BatchOutcome do
 
       message = outcome.summary_message(job_label: "TestJob")
 
-      expect(message).not_to include("Failures:")
+      expect(message).not_to include("char=")
     end
 
     it "shows at most 5 failure samples and appends overflow count" do
@@ -119,9 +127,9 @@ RSpec.describe BatchOutcome do
 
       message = outcome.summary_message(job_label: "TestJob")
 
-      expect(message).to include("0: err0")
-      expect(message).to include("4: err4")
-      expect(message).not_to include("5: err5")
+      expect(message).to include("char=0 err=err0")
+      expect(message).to include("char=4 err=err4")
+      expect(message).not_to include("char=5")
       expect(message).to include("(+1 more)")
     end
   end

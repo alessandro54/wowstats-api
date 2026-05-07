@@ -131,6 +131,27 @@ RSpec.describe Blizzard::Client do
     end
   end
 
+  describe "rate limiter scoping" do
+    after { Blizzard::RateLimiter.reset! }
+
+    it "uses separate buckets per region for the same credential" do
+      us_client = described_class.new(region: "us", locale: "en_US", auth: auth_double)
+      eu_client = described_class.new(region: "eu", locale: "en_GB", auth: auth_double)
+
+      us_limiter = us_client.send(:rate_limiter)
+      eu_limiter = eu_client.send(:rate_limiter)
+
+      expect(us_limiter).not_to be(eu_limiter)
+    end
+
+    it "shares a bucket for the same credential and region" do
+      client_a = described_class.new(region: "us", locale: "en_US", auth: auth_double)
+      client_b = described_class.new(region: "us", locale: "en_US", auth: auth_double)
+
+      expect(client_a.send(:rate_limiter)).to be(client_b.send(:rate_limiter))
+    end
+  end
+
   describe "namespace helpers" do
     let(:client) { described_class.new(region: "eu", locale: "en_GB", auth: auth_double) }
 

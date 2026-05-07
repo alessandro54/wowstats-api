@@ -161,7 +161,7 @@ module Blizzard
       # rubocop:enable Metrics/MethodLength, Metrics/AbcSize
 
       def rate_limiter
-        RateLimiter.for_credential(auth.client_id)
+        RateLimiter.for_credential("#{auth.client_id}:#{region}")
       end
 
       def build_url(path)

@@ -17,7 +17,7 @@ class Avo::Actions::BuildAggregationsAction < Avo::BaseAction
 
     if fields[:skip_staleness_check]
       # Reset snapshot timestamps so stale? check passes for all aggregations
-      Pvp::BuildAggregationsJob::AGGREGATIONS.each do |_, _, model_class, _|
+      Pvp::BuildAggregationsService::AGGREGATIONS.each do |_key, _service, model_class|
         model_class.where(pvp_season_id: season.id).update_all(snapshot_at: 1.year.ago) # rubocop:disable Rails/SkipsModelValidations
       end
     end

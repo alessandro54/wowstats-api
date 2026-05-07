@@ -7,9 +7,10 @@ module Pvp
       Rails.logger.warn("[SyncCharacterBatchJob] API error, will retry: #{error.message}")
     end
 
-    # rubocop:disable Metrics/AbcSize
-    def perform(character_ids:, locale: "en_US", sync_cycle_id: nil)
+    # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+    def perform(character_ids:, locale: "en_US", sync_cycle_id: nil, region: nil)
       @sync_cycle_id = sync_cycle_id
+      @region        = region
 
       ids = Array(character_ids).compact
       return if ids.empty?
@@ -28,13 +29,15 @@ module Pvp
       outcome = BatchOutcome.new
       process_characters_concurrently(characters_by_id.values, locale, outcome)
 
-      Rails.logger.info(outcome.summary_message(job_label: "SyncCharacterBatchJob"))
+      Rails.logger.info(
+        outcome.summary_message(job_label: "SyncCharacterBatchJob", cycle_id: sync_cycle_id, region: region)
+      )
       Pvp::SyncLogger.batch_complete(outcome: outcome)
       outcome.raise_if_total_failure!(job_label: "SyncCharacterBatchJob")
     ensure
       track_sync_cycle_completion
     end
-    # rubocop:enable Metrics/AbcSize
+    # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
 
     private
 
@@ -166,6 +169,9 @@ module Pvp
         cycle.increment_completed_character_batches!
 
         if cycle.all_character_batches_done?
+          elapsed = (Time.current - cycle.created_at).round
+          season_name = cycle.pvp_season&.display_name || "Season #{cycle.pvp_season_id}"
+          Pvp::SyncLogger.characters_complete(cycle: cycle, season_name: season_name, elapsed_seconds: elapsed)
           Pvp::RecoverFailedCharacterSyncsJob.perform_later(cycle.id)
         end
       rescue => e

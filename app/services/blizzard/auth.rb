@@ -46,13 +46,17 @@ module Blizzard
       end
     end
 
+    def self.invalidate_in_process!(client_id)
+      PROCESS_TOKEN_MUTEX.synchronize do
+        @process_tokens.delete(client_id)
+        @process_expires_at.delete(client_id)
+      end
+    end
+
     # Clears both caches so the next access_token call fetches a fresh token.
     # Called by the API client when Blizzard returns 401 Unauthorized.
     def invalidate!
-      PROCESS_TOKEN_MUTEX.synchronize do
-        @process_tokens.delete(@client_id)
-        @process_expires_at.delete(@client_id)
-      end
+      self.class.invalidate_in_process!(@client_id)
       Rails.cache&.delete(self.class.cache_key_for(@client_id))
     end
 

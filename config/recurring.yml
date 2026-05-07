@@ -15,6 +15,13 @@ production:
     queue: default
     schedule: every 6 hours
 
+  sync_talent_trees:
+    class: SyncTalentTreesJob
+    queue: default
+    args:
+      force: true
+    schedule: every day at 3am
+
   ensure_meta_translations:
     class: EnsureMetaTranslationsJob
     queue: default

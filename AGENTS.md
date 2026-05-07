@@ -108,7 +108,7 @@ Four-phase pipeline, all jobs under `app/jobs/pvp/`:
 
 1. **`Pvp::SyncCurrentSeasonLeaderboardsJob`** — orchestrator; creates a `PvpSyncCycle`, discovers brackets for US+EU concurrently, calls `SyncLeaderboardService` per bracket, then enqueues `SyncCharacterBatchJob` batches to region-isolated queues (`character_sync_us`, `character_sync_eu`). Skips if a cycle is already active (notifies Telegram). Accepts `locale:` param.
 2. **`Pvp::SyncCharacterBatchJob`** — processes a batch of characters concurrently via threads; calls `SyncCharacterService` per character; atomically increments `PvpSyncCycle#completed_character_batches` and triggers `BuildAggregationsJob` when all batches finish. Skips entire batch if cycle status is `:aborted`.
-3. **`Pvp::BuildAggregationsJob`** — runs `ItemAggregationService`, `EnchantAggregationService`, `GemAggregationService`, `TalentAggregationService`, and `ClassDistributionService` per bracket. Skips if cycle is `:aborted`.
+3. **`Pvp::BuildAggregationsJob`** — runs `ItemAggregationService`, `EnchantAggregationService`, `GemAggregationService`, `TalentAggregationService`, and `BayesianClassDistributionService` per bracket. Skips if cycle is `:aborted`.
 4. **`Pvp::SyncBracketJob`** — standalone single-bracket sync (no sync cycle), for ad-hoc/manual use.
 
 `PvpSyncCycle` status machine: `syncing_leaderboards → syncing_characters → completed / failed / aborted`. Abort is set via Telegram `/abort <id>` or button; all in-flight batch and aggregation jobs respect it.

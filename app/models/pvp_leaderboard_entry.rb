@@ -53,10 +53,11 @@ class PvpLeaderboardEntry < ApplicationRecord
   scope :latest_snapshot_for_bracket, ->(bracket, season_id: nil) {
     season_filter = season_id.present? ? season_id : PvpSeason.where(is_current: true).select(:id).limit(1)
 
-    joins(pvp_leaderboard: :pvp_season)
-      .where(pvp_leaderboards: { bracket: bracket })
+    base = joins(pvp_leaderboard: :pvp_season)
       .where(pvp_seasons: { id: season_filter })
       .where.not(spec_id: nil)
+
+    Pvp::BracketResolver.scope(base, bracket, column: "pvp_leaderboards.bracket")
   }
 
   def winrate

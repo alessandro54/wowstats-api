@@ -84,6 +84,18 @@ module Pvp
     end
     # rubocop:enable Metrics/AbcSize
 
+    # ── Phase 2 complete — all character batches done ────────────────────────
+
+    def self.characters_complete(cycle:, season_name:, elapsed_seconds: nil)
+      elapsed = elapsed_seconds ? " in #{format_elapsed(elapsed_seconds)}" : ""
+      logger.info("SYNC CYCLE ##{cycle.id} — characters complete#{elapsed}, running aggregations")
+      TelegramNotifier.send(
+        "✓ <b>Characters synced#{elapsed}</b>\n" \
+        "Cycle ##{cycle.id} — #{season_name}\n" \
+        "#{cycle.completed_character_batches}/#{cycle.expected_character_batches} batches · aggregating…"
+      )
+    end
+
     # ── Phase 3 — Aggregations ───────────────────────────────────────────────
 
     def self.aggregations_complete(items:, enchants:, gems:, talents: nil)

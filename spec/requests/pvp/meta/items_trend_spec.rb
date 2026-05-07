@@ -18,7 +18,7 @@ RSpec.describe "GET /api/v1/pvp/meta/items", type: :request do
 
     it "returns trend: up" do
       get_items
-      expect(response.parsed_body.first["trend"]).to eq("up")
+      expect(response.parsed_body["items"].first["trend"]).to eq("up")
     end
   end
 
@@ -32,7 +32,7 @@ RSpec.describe "GET /api/v1/pvp/meta/items", type: :request do
 
     it "returns trend: down" do
       get_items
-      expect(response.parsed_body.first["trend"]).to eq("down")
+      expect(response.parsed_body["items"].first["trend"]).to eq("down")
     end
   end
 
@@ -46,7 +46,7 @@ RSpec.describe "GET /api/v1/pvp/meta/items", type: :request do
 
     it "returns trend: new" do
       get_items
-      expect(response.parsed_body.first["trend"]).to eq("new")
+      expect(response.parsed_body["items"].first["trend"]).to eq("new")
     end
   end
 
@@ -60,7 +60,7 @@ RSpec.describe "GET /api/v1/pvp/meta/items", type: :request do
 
     it "returns trend: stable" do
       get_items
-      expect(response.parsed_body.first["trend"]).to eq("stable")
+      expect(response.parsed_body["items"].first["trend"]).to eq("stable")
     end
   end
 end

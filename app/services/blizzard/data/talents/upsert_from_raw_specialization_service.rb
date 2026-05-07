@@ -1,7 +1,7 @@
 module Blizzard
   module Data
     module Talents
-      class UpsertFromRawSpecializationService
+      class UpsertFromRawSpecializationService < BaseService
         TALENT_CACHE_TTL = 1.hour
 
         def self.call(raw_specialization:, locale: "en_US")
@@ -70,16 +70,42 @@ module Blizzard
 
           return empty_result if talent_records.empty?
 
-          # Deduplicate by blizzard_id
           unique_records = talent_records.uniq { |r| r[:blizzard_id] }
+                                         .sort_by { |r| r[:blizzard_id] }
 
-          # Insert talent entities — skip on conflict. blizzard_id/talent_type/spell_id are
-          # static reference data; DO NOTHING avoids ShareLock contention under concurrent syncs.
+          # INSERT only genuinely new blizzard_ids — no ON CONFLICT clause.
+          #
+          # insert_all with unique_by: acquires a ShareLock on every index tuple it
+          # checks for conflicts. With 15 concurrent threads all inserting the same
+          # class-tree blizzard_ids, those ShareLocks deadlock each other.
+          #
+          # The fix: SELECT existing ids first (plain index scan, no locks held),
+          # then INSERT only the rows that are not yet present. In steady state
+          # (talents already seeded after first sync) the INSERT list is empty and
+          # no locks are taken at all. For genuinely new talent ids there is no
+          # concurrent thread inserting the same row, so no conflict is possible.
           # rubocop:disable Rails/SkipsModelValidations
-          Talent.insert_all(
-            unique_records.map { |r| r.except(:name) },
-            unique_by: :blizzard_id
-          )
+          all_blizzard_ids = unique_records.map { |r| r[:blizzard_id] }
+          existing_ids     = Talent.where(blizzard_id: all_blizzard_ids).pluck(:blizzard_id).to_set
+          new_records      = unique_records.reject { |r| existing_ids.include?(r[:blizzard_id]) }
+
+          Talent.insert_all!(new_records.map { |r| r.except(:name) }) if new_records.any?
+
+          # Correct talent_type drift: character data is authoritative for class/spec/pvp
+          # classification, but NOT for hero. Gateway talents like Halo and Void Torrent
+          # appear under "class_talents" in the Blizzard character specialization endpoint
+          # even though they are hero talents — so never downgrade hero to class/spec/pvp.
+          # SyncTreeService sets hero classification from the static tree API and guards it
+          # with the same rule. Both sources must agree: hero is a one-way ratchet.
+          unique_records.group_by { |r| r[:talent_type] }.each do |talent_type, records|
+            next if talent_type == "hero" # hero is set by SyncTreeService, never by character data
+
+            blizzard_ids = records.map { |r| r[:blizzard_id] }
+            Talent.where(blizzard_id: blizzard_ids)
+                  .where.not(talent_type: talent_type)
+                  .where.not(talent_type: "hero")
+                  .update_all(talent_type: talent_type)
+          end
           # rubocop:enable Rails/SkipsModelValidations
 
           # Fetch internal IDs with caching
@@ -175,9 +201,9 @@ module Blizzard
 
             return if translation_records.empty?
 
-            unique_translations = translation_records.uniq do |r|
-              [ r[:translatable_type], r[:translatable_id], r[:locale], r[:key] ]
-            end
+            unique_translations = translation_records
+              .uniq { |r| [ r[:translatable_type], r[:translatable_id], r[:locale], r[:key] ] }
+              .sort_by { |r| [ r[:translatable_id].to_s, r[:locale], r[:key] ] }
 
             # rubocop:disable Rails/SkipsModelValidations
             Translation.insert_all(

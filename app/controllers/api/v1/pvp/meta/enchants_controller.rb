@@ -1,11 +1,10 @@
-class Api::V1::Pvp::Meta::EnchantsController < Api::V1::BaseController
-  include MetaParams
+class Api::V1::Pvp::Meta::EnchantsController < Api::V1::Pvp::Meta::BaseController
+  before_action :validate_meta_params!
 
   def index
-    cache_key = meta_cache_key("enchants", bracket_param, spec_id_param, slot_param, locale_param)
-    json = meta_cache_fetch(cache_key) { serialize_enchants_response }
-    render json: json
-    set_cache_headers
+    serve_meta("enchants", bracket_param, spec_id_param, slot_param, locale_param) do
+      serialize_enchants_response
+    end
   end
 
   private

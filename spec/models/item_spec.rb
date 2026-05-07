@@ -41,7 +41,7 @@ RSpec.describe Item, type: :model do
 
   describe '#meta_synced?' do
     context 'when meta_synced_at is recent' do
-      let(:item) { build(:item, meta_synced_at: 3.days.ago) }
+      let(:item) { build(:item, icon_url: "https://example.com/icon.jpg", meta_synced_at: 3.days.ago) }
 
       it 'returns true' do
         expect(item.meta_synced?).to be true

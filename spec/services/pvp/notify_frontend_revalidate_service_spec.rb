@@ -20,10 +20,11 @@ RSpec.describe Pvp::NotifyFrontendRevalidateService, type: :service do
     end
 
     it "POSTs to /api/revalidate with the secret header" do
-      expect(HTTPX).to receive(:post).with(
+      response = instance_double(HTTPX::Response, status: 200)
+      expect(HTTPX).to receive(:post).once.with(
         "https://www.wowstats.gg/api/revalidate",
         headers: { "x-revalidate-secret" => "test-secret" }
-      )
+      ).and_return(response)
       expect(result).to be_success
     end
 

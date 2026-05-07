@@ -34,10 +34,11 @@ RSpec.describe "Api::V1::Pvp::Meta::Items", type: :request do
         expect(response).to have_http_status(:ok)
         json = JSON.parse(response.body)
 
-        expect(json).to be_an(Array)
-        expect(json.first["item"]["name"]).to eq("Helm of Testing")
-        expect(json.first["slot"]).to eq("head")
-        expect(json.first["usage_pct"]).to eq(75.5)
+        expect(json["items"]).to be_an(Array)
+        expect(json["items"].first["item"]["name"]).to eq("Helm of Testing")
+        expect(json["items"].first["slot"]).to eq("head")
+        expect(json["items"].first["usage_pct"]).to eq(75.5)
+        expect(json["meta"]).to have_key("snapshot_at")
       end
 
       it "filters by slot when provided" do
@@ -51,8 +52,8 @@ RSpec.describe "Api::V1::Pvp::Meta::Items", type: :request do
         get "/api/v1/pvp/meta/items", params: { bracket: "3v3", spec_id: 62, slot: "head" }
 
         json = JSON.parse(response.body)
-        expect(json.length).to eq(1)
-        expect(json.first["slot"]).to eq("head")
+        expect(json["items"].length).to eq(1)
+        expect(json["items"].first["slot"]).to eq("head")
       end
     end
 

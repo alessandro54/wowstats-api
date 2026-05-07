@@ -216,4 +216,23 @@ RSpec.describe Blizzard::Auth do
       end
     end
   end
+
+  describe "#invalidate!" do
+    let(:cache_key) { Blizzard::Auth.cache_key_for(client_id) }
+
+    before do
+      described_class.store_in_process(client_id, "some-token", 1.hour.from_now)
+      allow(Rails.cache).to receive(:delete)
+    end
+
+    it "removes the in-process token" do
+      auth.invalidate!
+      expect(described_class.in_process_token(client_id)).to be_nil
+    end
+
+    it "deletes the Rails cache entry" do
+      auth.invalidate!
+      expect(Rails.cache).to have_received(:delete).with(cache_key)
+    end
+  end
 end

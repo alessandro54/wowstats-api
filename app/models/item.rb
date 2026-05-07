@@ -28,6 +28,6 @@ class Item < ApplicationRecord
   validates :blizzard_id, presence: true, uniqueness: true
 
   def meta_synced?
-    meta_synced_at.present? && meta_synced_at > Pvp::SyncConfig::META_TTL.ago
+    icon_url.present? && meta_synced_at.present? && meta_synced_at > Pvp::SyncConfig::META_TTL.ago
   end
 end

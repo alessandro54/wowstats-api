@@ -1,19 +1,24 @@
 require "rails_helper"
 
 RSpec.describe Pvp::Meta::TalentAggregationService, type: :service do
+  # Tier classification moved into Pvp::Meta::TalentTierClassifier; the
+  # service now delegates to it. The behavioural specs below still target
+  # the same private helpers — just on the classifier instance.
   describe "#assign_tree_tiers (private)" do
-    subject(:service) { described_class.new(season: create(:pvp_season)) }
-
-    THRESHOLD = described_class::SITUATIONAL_THRESHOLD
-
-    before do
-      service.instance_variable_set(:@talent_info, {
+    let(:talent_info) do
+      {
         1 => { node_id: 101, max_rank: 1, default_points: 0 },
         2 => { node_id: 102, max_rank: 1, default_points: 0 },
         3 => { node_id: 103, max_rank: 1, default_points: 0 },
         4 => { node_id: 104, max_rank: 2, default_points: 0 } # multi-rank (apex-style) node
-      })
+      }
     end
+
+    subject(:service) do
+      Pvp::Meta::TalentTierClassifier.new(rows: [], prereqs: {}, talent_info: talent_info)
+    end
+
+    THRESHOLD = Pvp::Meta::TalentTierClassifier::SITUATIONAL_THRESHOLD
 
     def row(talent_id:, in_top_build:, usage_pct:)
       { "talent_id" => talent_id, "in_top_build" => in_top_build,
@@ -128,14 +133,21 @@ RSpec.describe Pvp::Meta::TalentAggregationService, type: :service do
   end
 
   describe "#assign_tier_to_node (private)" do
-    subject(:service) { described_class.new(season: create(:pvp_season)) }
-
-    before do
-      service.instance_variable_set(:@talent_info, {
+    let(:talent_info) do
+      {
         10 => { node_id: 200, max_rank: 1, default_points: 0 },
         11 => { node_id: 200, max_rank: 1, default_points: 0 }
-      })
-      service.instance_variable_set(:@talent_names, { 10 => "Dark Dance", 11 => "Secret Step" })
+      }
+    end
+    let(:talent_names) { { 10 => "Dark Dance", 11 => "Secret Step" } }
+
+    subject(:service) do
+      Pvp::Meta::TalentTierClassifier.new(
+        rows:         [],
+        prereqs:      {},
+        talent_info:  talent_info,
+        talent_names: talent_names
+      )
     end
 
     def choice_row(talent_id:, usage_pct:)

@@ -6,15 +6,8 @@ module Pvp
 
       TOP_N = Pvp::SyncConfig::META_TOP_N
 
-      # Fallback thresholds used when Jenks cannot find natural breaks
-      # (e.g. fewer than k+1 distinct usage values in the group).
-      BIS_THRESHOLD         = 75.0
-      SITUATIONAL_THRESHOLD = 50.0
-      COMMON_THRESHOLD      = 35.0
-
-      # Budget per tree type (talent points available)
-      TREE_BUDGETS = { "class" => 34, "spec" => 34, "hero" => 10 }.freeze
-      HERO_OFF_TREE_THRESHOLD = 30.0
+      BIS_THRESHOLD         = TalentTierClassifier::BIS_THRESHOLD
+      SITUATIONAL_THRESHOLD = TalentTierClassifier::SITUATIONAL_THRESHOLD
 
       # Player weight tiers — elite players' choices count more.
       # Elite (3x):       top 15% rating AND winrate > 60%
@@ -88,11 +81,23 @@ module Pvp
 
         attr_reader :season, :top_n, :cycle
 
-        # Override to filter on specialization_processed_at instead of equipment_processed_at
-        def top_chars_cte
+        # Override: filters on specialization_processed_at (not equipment_processed_at)
+        # and adds wins/losses/weight columns needed for the weighted talent query.
+        # rubocop:disable Metrics/MethodLength
+        def top_chars_cte(bracket: nil)
+          if bracket
+            distinct_on  = "e.character_id"
+            order_by     = "e.character_id, e.rating DESC"
+            bracket_cond = "AND l.bracket = :bracket"
+          else
+            distinct_on  = "l.bracket, e.character_id"
+            order_by     = "l.bracket, e.character_id, e.rating DESC"
+            bracket_cond = ""
+          end
+
           <<~SQL
             latest_per_char AS (
-              SELECT DISTINCT ON (l.bracket, e.character_id)
+              SELECT DISTINCT ON (#{distinct_on})
                 e.character_id,
                 l.bracket,
                 e.spec_id,
@@ -102,9 +107,10 @@ module Pvp
               FROM pvp_leaderboard_entries e
               JOIN pvp_leaderboards l ON l.id = e.pvp_leaderboard_id
               WHERE l.pvp_season_id = :season_id
+                #{bracket_cond}
                 AND e.spec_id IS NOT NULL
                 AND e.specialization_processed_at IS NOT NULL
-              ORDER BY l.bracket, e.character_id, e.rating DESC
+              ORDER BY #{order_by}
             ),
             ranked AS (
               SELECT *,
@@ -127,6 +133,7 @@ module Pvp
             )
           SQL
         end
+        # rubocop:enable Metrics/MethodLength
 
         # Builds the top-build CTEs: fingerprint each character's full talent loadout,
         # find the single most common loadout per bracket/spec, expose its talent ids,
@@ -186,10 +193,22 @@ module Pvp
           SQL
         end
 
-        # rubocop:disable Metrics/MethodLength
         def execute_query
-          sql = <<~SQL
-            WITH #{top_chars_cte},
+          run_per_bracket(season_brackets) do |bracket|
+            ApplicationRecord.connection.select_all(
+              ApplicationRecord.sanitize_sql_array([
+                talent_sql(bracket),
+                { season_id: season.id, top_n: top_n, bracket: bracket,
+                  bis_pct: BIS_THRESHOLD, sit_pct: SITUATIONAL_THRESHOLD }
+              ])
+            )
+          end
+        end
+
+        # rubocop:disable Metrics/MethodLength
+        def talent_sql(bracket)
+          <<~SQL
+            WITH #{top_chars_cte(bracket: bracket)},
             spec_totals AS (
               SELECT bracket, spec_id, SUM(weight) AS total
               FROM top_chars
@@ -244,18 +263,6 @@ module Pvp
               AND tbmr.talent_id = tu.talent_id
             ORDER BY tu.bracket, tu.spec_id, tu.talent_type, tu.usage_count DESC
           SQL
-
-          ApplicationRecord.connection.execute("SET LOCAL work_mem = '256MB'")
-          ApplicationRecord.connection.select_all(
-            ApplicationRecord.sanitize_sql_array(
-              [ sql, {
-                season_id: season.id,
-                top_n:     top_n,
-                bis_pct:   BIS_THRESHOLD,
-                sit_pct:   SITUATIONAL_THRESHOLD
-              } ]
-            )
-          )
         end
         # rubocop:enable Metrics/MethodLength
 
@@ -309,6 +316,10 @@ module Pvp
         # TalentSpecAssignment for the current spec. Merge its usage into the
         # canonical (TSA-assigned) entry and discard the stale one.
         #
+        # When no canonical appears in the current rows (e.g. no player uses the
+        # new blizzard_id yet in this bracket), remap the stale row to the
+        # canonical talent_id so max_rank/spell_id come from the correct record.
+        #
         # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
         def merge_stale_variants(rows)
           return rows if rows.empty?
@@ -323,24 +334,65 @@ module Pvp
             .pluck(:talent_id, :spec_id)
             .to_set
 
+          # Canonical talent_id lookup for stale rows whose canonical is not in
+          # the current rows. Keyed by [spec_id, name] → single assigned talent_id.
+          # Skips ambiguous cases (multiple assigned talents with the same name = choice node).
+          canonical_by_spec_name = build_canonical_tid_map(spec_ids, names.values.uniq.compact)
+
           rows
             .group_by { |r| [ r["bracket"], r["spec_id"], names[r["talent_id"]] ] }
-            .flat_map do |(_bracket, spec_id, _name), group|
-              next group if group.size == 1
-
+            .flat_map do |(_bracket, spec_id, name), group|
               canonical = group.select { |r| assigned_ids.include?([ r["talent_id"], spec_id ]) }
-              stale     = group.reject { |r| assigned_ids.include?([ r["talent_id"], spec_id ]) }
 
-              # Only discard stale when exactly one canonical entry exists; otherwise pass through unchanged.
-              next group unless canonical.size == 1
+              # Happy path: exactly one canonical in current rows — discard stale.
+              next canonical if canonical.size == 1
 
-              # Do not sum stale usage into canonical — re-processed characters contribute to both
-              # old and new CharacterTalent records, so summing would double-count and exceed 100%.
-              # Just keep the canonical entry and discard the stale ones.
-              canonical
+              # Multiple canonicals (real choice node) or all canonical: pass through.
+              next group if canonical.size > 1 || canonical.size == group.size
+
+              # All entries are stale (no TSA match in current rows).
+              # Remap the highest-usage row to the canonical talent_id so that
+              # max_rank/spell_id come from the correct record.
+              if name
+                canonical_tid = canonical_by_spec_name[[ spec_id, name ]]
+                if canonical_tid
+                  remapped = group.max_by { |r| r["usage_pct"].to_f }.dup
+                  remapped["talent_id"] = canonical_tid
+                  next [ remapped ]
+                end
+              end
+
+              # No assigned canonical found: pass through unchanged.
+              group
             end
         end
         # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
+
+        # Returns { [spec_id, name] => talent_id } for names that map to exactly
+        # one assigned talent per spec (skips choice nodes with multiple assignments).
+        # rubocop:disable Metrics/AbcSize
+        def build_canonical_tid_map(spec_ids, names)
+          return {} if names.empty?
+
+          assigned_pairs = TalentSpecAssignment.where(spec_id: spec_ids).pluck(:talent_id, :spec_id)
+          tid_names      = load_tid_names(assigned_pairs.map(&:first).uniq)
+
+          assigned_pairs
+            .select { |(tid, _)| names.include?(tid_names[tid]) }
+            .group_by { |(tid, sid)| [ sid, tid_names[tid] ] }
+            .each_with_object({}) do |((sid, name), pairs), h|
+              next unless pairs.size == 1
+
+              h[[ sid, name ]] = pairs.first.first
+            end
+        end
+        # rubocop:enable Metrics/AbcSize
+
+        def load_tid_names(talent_ids)
+          Translation
+            .where(translatable_type: "Talent", translatable_id: talent_ids, key: "name", locale: "en_US")
+            .pluck(:translatable_id, :value).to_h
+        end
 
         # ── Drop unresolvable stale talents ─────────────────────────────
         #
@@ -369,334 +421,14 @@ module Pvp
         end
         # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
 
-        # ── Tier assignment ──────────────────────────────────────────────
-        #
-        # For each (bracket, spec, talent_type) group:
-        #
-        #   Hero trees  → selected sub-tree all BiS, off-tree situational/common
-        #   Class/Spec  → in_top_build nodes → BiS (budget always fully spent because
-        #                 the top-build fingerprint is a real player's complete 34-pt build,
-        #                 so all prerequisite nodes are included automatically);
-        #                 non-top-build nodes with pct ≥ SITUATIONAL_THRESHOLD → situational
-        #
-        # Choice nodes: primary talent gets node tier, alternatives demoted one level.
-        #
         def apply_budget_tiers(rows)
           return rows if rows.empty?
 
-          @prereqs = load_prerequisite_graph
-          @talent_info = load_talent_info(rows)
-
-          groups = rows.group_by { |r| [ r["bracket"], r["spec_id"], r["talent_type"] ] }
-
-          groups.each do |(_, _, talent_type), group_rows|
-            budget = TREE_BUDGETS[talent_type]
-
-            unless budget
-              assign_pvp_tiers(group_rows)
-              next
-            end
-
-            node_rows = build_node_rows(group_rows)
-
-            if talent_type == "hero"
-              assign_hero_tiers(node_rows)
-            else
-              assign_tree_tiers(node_rows, budget)
-            end
-          end
-
-          rows
-        end
-
-        # ── Node grouping ───────────────────────────────────────────────
-
-        # Groups SQL rows by node_id. Talents on the same node are choice alternatives.
-        def build_node_rows(group_rows)
-          node_rows = Hash.new { |h, k| h[k] = [] }
-          group_rows.each do |r|
-            info = @talent_info[r["talent_id"]]
-            next unless info&.[](:node_id)
-
-            node_rows[info[:node_id]] << r
-          end
-          node_rows
-        end
-
-        # The highest-usage talent on a node (the "pick" for choice nodes).
-        def primary_talent(node_group)
-          node_group.max_by { |r| r["usage_pct"].to_f }
-        end
-
-        # ── Class/Spec tree tier assignment ─────────────────────────────
-
-        # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
-        # BiS = highest-usage in_top_build nodes that fit within the budget.
-        # Overflow in_top_build nodes (snapshot-merge inflation from patch changes)
-        # drop into the Jenks pool and get classified by usage like any non-top-build node.
-        def assign_tree_tiers(node_rows, budget)
-          top_build_nodes = node_rows
-            .select { |_, group| group.any? { |r| r["in_top_build"] } }
-            .sort_by { |_, group| -primary_talent(group)["usage_pct"].to_f }
-
-          bis_nodes = Set.new
-          remaining = budget
-
-          top_build_nodes.each do |node_id, group|
-            cost = @talent_info.dig(primary_talent(group)["talent_id"], :max_rank) || 1
-            next if cost > remaining
-
-            bis_nodes.add(node_id)
-            remaining -= cost
-          end
-
-          non_bis_usages = node_rows
-            .reject { |node_id, _| bis_nodes.include?(node_id) }
-            .map    { |_, group| primary_talent(group)["usage_pct"].to_f }
-
-          # Situational = genuinely competes with BIS nodes.
-          # Threshold is half the weakest BIS node's usage: if lowest BIS is at 60%,
-          # non-BIS nodes at 42% are real alternatives (same ballpark → situational).
-          # If all BIS are at 90%+, anything below 45% is a fringe pick → common.
-          # Jenks is skipped here — it creates artificial gaps between near-equal values
-          # (e.g. 47% vs 42% get split even though both are genuine situational picks).
-          # When no BIS exists (budget=0), fall back to SITUATIONAL_THRESHOLD.
-          lowest_bis_pct = bis_nodes.filter_map { |nid|
-            node_rows[nid]&.then { |g| primary_talent(g)["usage_pct"].to_f }
-          }.min || 0.0
-          sit_threshold = bis_nodes.any? ? lowest_bis_pct * 0.5 : SITUATIONAL_THRESHOLD
-
-          sit_nodes = node_rows
-            .reject { |node_id, _| bis_nodes.include?(node_id) }
-            .select { |_, group| primary_talent(group)["usage_pct"].to_f >= sit_threshold }
-            .keys.to_set
-
-          write_tiers(node_rows, bis_nodes, sit_nodes)
-        end
-        # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
-
-        # PvP talents: pick N from a pool per matchup.
-        # Jenks finds the natural break between always-picked (BIS), flex/matchup
-        # options (situational), and ignored talents (common) — no hardcoded thresholds.
-        def assign_pvp_tiers(group_rows)
-          return if group_rows.empty?
-
-          breaks        = jenks_breaks(group_rows.map { |r| r["usage_pct"].to_f }, 3)
-          bis_threshold = breaks[1] || BIS_THRESHOLD
-          sit_threshold = breaks[0] || SITUATIONAL_THRESHOLD
-
-          group_rows.each do |r|
-            r["tier"] = case r["usage_pct"].to_f
-            when (bis_threshold..) then "bis"
-            when (sit_threshold..) then "situational"
-            else "common"
-            end
-          end
-        end
-
-        # ── Fisher-Jenks natural breaks ──────────────────────────────────
-        #
-        # Partitions `values` into `k` classes by minimising within-class
-        # sum-of-squared deviations (Fisher's exact algorithm, O(n²k)).
-        # Returns k-1 ascending break points (first value of each upper class).
-        # Returns [] when there are not enough distinct values to form k classes.
-        #
-        # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
-        def jenks_breaks(values, k)
-          sorted = values.map(&:to_f).sort
-          return [] if sorted.size <= k
-
-          ssd         = build_ssd_matrix(sorted)
-          min_cost    = Array.new(sorted.size) { Array.new(k + 1, Float::INFINITY) }
-          class_start = Array.new(sorted.size) { Array.new(k + 1, 0) }
-
-          sorted.each_index { |i| min_cost[i][1] = ssd[0][i] }
-
-          (2..k).each do |num_classes|
-            (num_classes - 1...sorted.size).each do |right|
-              (num_classes - 2...right).each do |split|
-                cost = min_cost[split][num_classes - 1] + ssd[split + 1][right]
-                next unless cost < min_cost[right][num_classes]
-
-                min_cost[right][num_classes]    = cost
-                class_start[right][num_classes] = split + 1
-              end
-            end
-          end
-
-          _, breaks = k.downto(2).reduce([ sorted.size - 1, [] ]) do |(i, acc), c|
-            start = class_start[i][c]
-            [ start - 1, acc << sorted[start] ]
-          end
-          breaks.reverse
-        end
-        # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
-
-        # rubocop:disable Metrics/AbcSize
-        def build_ssd_matrix(sorted)
-          n = sorted.size
-          Array.new(n) { Array.new(n, 0.0) }.tap do |ssd|
-            sorted.each_with_index do |val, i|
-              sum    = val
-              sum_sq = val**2
-              (i + 1...n).each do |j|
-                sum    += sorted[j]
-                sum_sq += sorted[j]**2
-                ssd[i][j] = sum_sq - sum**2 / (j - i + 1).to_f
-              end
-            end
-          end
-        end
-        # rubocop:enable Metrics/AbcSize
-
-        # Write final tiers to rows. Choice node alternatives demoted one level.
-        def write_tiers(node_rows, bis_nodes, sit_nodes)
-          node_rows.each do |node_id, node_group|
-            tier = case node_id
-            when bis_nodes then "bis"
-            when sit_nodes then "situational"
-            else "common"
-            end
-            assign_tier_to_node(node_group, tier)
-          end
-        end
-
-        # For a single node: primary gets the tier, choice alternatives drop one level.
-        # Contested BIS choice (gap <= 30 pts): node is required but neither talent is
-        # "the" pick — both become situational so players know to choose by matchup.
-        # Multi-rank nodes (same talent, multiple ranks) all get the same tier.
-        # rubocop:disable Metrics/AbcSize
-        def assign_tier_to_node(node_group, tier)
-          return node_group.each { |r| r["tier"] = tier } unless choice_node?(node_group) && tier != "common"
-
-          primary     = primary_talent(node_group)
-          primary_pct = primary["usage_pct"].to_f
-          alts        = node_group.reject { |r| r.equal?(primary) }
-          contested   = alts.any? { |r| primary_pct - r["usage_pct"].to_f <= 30.0 }
-
-          # Contested BIS: node required but pick is matchup-dependent — demote all to situational.
-          return node_group.each { |r| r["tier"] = "situational" } if tier == "bis" && contested
-
-          primary["tier"] = tier
-          alts.each do |r|
-            r["tier"] = if contested || (tier == "bis" && r["usage_pct"].to_f >= COMMON_THRESHOLD)
-              "situational"
-            else
-              "common"
-            end
-          end
-        end
-        # rubocop:enable Metrics/AbcSize
-
-        # A choice node has multiple talents with different blizzard_ids (real alternatives).
-        # Multi-rank nodes have multiple rows but are the same talent at different ranks.
-        def choice_node?(node_group)
-          return false if node_group.size <= 1
-
-          node_group.map { |r| @talent_info[r["talent_id"]]&.[](:node_id) }.uniq.size == 1 &&
-            node_group.map { |r| r["talent_id"] }.uniq.size > 1 &&
-            unique_talent_names(node_group) > 1
-        end
-
-        def unique_talent_names(node_group)
-          @talent_names ||= Translation
-            .where(translatable_type: "Talent", key: "name", locale: "en_US")
-            .pluck(:translatable_id, :value)
-            .to_h
-          node_group.map { |r| @talent_names[r["talent_id"]] }.compact.uniq.size
-        end
-
-        # ── Hero tree logic ─────────────────────────────────────────────
-        #
-        # Hero talents have 2 sub-trees (connected components). Players pick one.
-        # Selected sub-tree (higher avg usage): all BiS, choice alts → situational.
-        # Off-tree: all situational if avg >= 30%, otherwise common.
-
-        def assign_hero_tiers(node_rows)
-          sub_trees = find_connected_components(node_rows.keys)
-
-          ranked = sub_trees
-            .map { |nodes| { nodes: nodes, avg: avg_usage(nodes, node_rows) } }
-            .sort_by { |t| -t[:avg] }
-
-          ranked.each_with_index do |tree, idx|
-            if idx == 0
-              assign_selected_hero_tree(tree[:nodes], node_rows)
-            else
-              assign_off_hero_tree(tree[:nodes], tree[:avg], node_rows)
-            end
-          end
-        end
-
-        def assign_selected_hero_tree(node_ids, node_rows)
-          node_ids.each do |node_id|
-            node_group = node_rows[node_id]
-            next unless node_group
-
-            assign_tier_to_node(node_group, "bis")
-          end
-        end
-
-        def assign_off_hero_tree(node_ids, avg, node_rows)
-          tier = avg >= HERO_OFF_TREE_THRESHOLD ? "situational" : "common"
-          node_ids.each do |node_id|
-            node_group = node_rows[node_id]
-            next unless node_group
-
-            node_group.each { |r| r["tier"] = tier }
-          end
-        end
-
-        def avg_usage(node_ids, node_rows)
-          pcts = node_ids.flat_map { |nid| (node_rows[nid] || []).map { |r| r["usage_pct"].to_f } }
-          pcts.any? ? pcts.sum / pcts.size : 0.0
-        end
-
-        # Split node_ids into connected components via undirected prereq edges.
-        def find_connected_components(node_ids)
-          node_set = node_ids.to_set
-          adj = build_undirected_adjacency(node_set)
-
-          visited    = Set.new
-          components = []
-
-          node_ids.each do |n|
-            next if visited.include?(n)
-
-            component = bfs_component(n, adj, visited)
-            components << component
-          end
-
-          components
-        end
-
-        def build_undirected_adjacency(node_set)
-          adj = Hash.new { |h, k| h[k] = Set.new }
-          @prereqs.each do |nid, prereq_ids|
-            next unless node_set.include?(nid)
-
-            prereq_ids.each do |pid|
-              next unless node_set.include?(pid)
-
-              adj[nid].add(pid)
-              adj[pid].add(nid)
-            end
-          end
-          adj
-        end
-
-        def bfs_component(start, adj, visited)
-          component = Set.new
-          stack     = [ start ]
-          while stack.any?
-            cur = stack.pop
-            next if component.include?(cur)
-
-            component.add(cur)
-            visited.add(cur)
-            adj[cur].each { |nb| stack << nb unless component.include?(nb) }
-          end
-          component
+          TalentTierClassifier.new(
+            rows:        rows,
+            prereqs:     load_prerequisite_graph,
+            talent_info: load_talent_info(rows)
+          ).call
         end
 
         # ── Data loading ────────────────────────────────────────────────

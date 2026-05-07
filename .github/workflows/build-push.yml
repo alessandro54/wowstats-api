@@ -59,7 +59,7 @@ jobs:
       - name: Delete old container versions
         uses: actions/delete-package-versions@v5
         with:
-          package-name: ${{ github.event.repository.name }}
+          package-name: ${{ github.event.repository.name || github.event.workflow_run.repository.name }}
           package-type: container
           min-versions-to-keep: 5
           delete-untagged-versions: true

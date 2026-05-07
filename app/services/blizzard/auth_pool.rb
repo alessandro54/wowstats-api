@@ -1,7 +1,8 @@
 module Blizzard
   # Round-robin pool of Auth instances — one per registered Blizzard OAuth app.
-  # Each credential has its own independent 100 req/s rate-limit bucket, so N
-  # credentials give N × 100 req/s effective throughput per region.
+  # Each credential gets a separate rate-limit bucket per region (keyed by
+  # "client_id:region" in RateLimiter), so N credentials × 2 regions give
+  # N × 2 × 36,000 req/hr total sustained throughput.
   #
   # Configure via Rails credentials or ENV:
   #   Primary:   blizzard.client_id / blizzard.client_secret

@@ -1,13 +1,28 @@
 module Pvp
   module Meta
-    class ItemAggregationService < BaseAggregationService
-      aggregates model: PvpMetaItemPopularity, key_columns: %i[bracket spec_id slot item_id]
-
+    class ItemAggregationService < AggregationBase
       private
 
-        def aggregation_sql
+        def model_class
+          PvpMetaItemPopularity
+        end
+
+        def snapshot_keys
+          %i[bracket spec_id slot item_id]
+        end
+
+        def record_fields(row)
+          {
+            bracket: row["bracket"],
+            spec_id: row["spec_id"],
+            slot:    row["slot"],
+            item_id: row["item_id"]
+          }
+        end
+
+        def popularity_sql(bracket)
           <<~SQL
-            WITH #{top_chars_cte},
+            WITH #{top_chars_cte(bracket: bracket)},
             slot_totals AS (
               SELECT t.bracket, t.spec_id, ci.slot, COUNT(*) AS total
               FROM top_chars t
@@ -29,10 +44,6 @@ module Pvp
             GROUP BY t.bracket, t.spec_id, ci.slot, ci.item_id, st.total
             ORDER BY t.bracket, t.spec_id, ci.slot, usage_count DESC
           SQL
-        end
-
-        def row_attrs(row)
-          { slot: row["slot"], item_id: row["item_id"] }
         end
     end
   end

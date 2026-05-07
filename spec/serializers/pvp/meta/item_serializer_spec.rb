@@ -30,7 +30,6 @@ RSpec.describe Pvp::Meta::ItemSerializer do
     expect(result[:usage_count]).to eq(80)
     expect(result[:usage_pct]).to eq(55.0)
     expect(result[:prev_usage_pct]).to eq(40.0)
-    expect(result[:snapshot_at]).to eq(Time.zone.parse("2026-01-01 00:00:00"))
   end
 
   it "serializes nested item ref" do

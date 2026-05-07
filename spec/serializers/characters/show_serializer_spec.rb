@@ -7,7 +7,8 @@ RSpec.describe Characters::ShowSerializer do
       class_slug: "death-knight", race: "human", faction: "alliance",
       avatar_url: "https://cdn.example.com/avatar.jpg",
       inset_url: "https://cdn.example.com/inset.jpg",
-      stat_pcts: { "HASTE_RATING" => 18 }
+      stat_pcts: { "HASTE_RATING" => 18 },
+      spec_talent_loadout_codes: { "250" => "C0BAAA..." }
     ).tap do |c|
       allow(c).to receive(:character_items).and_return(
         instance_double("ActiveRecord::Relation", where: double(includes: []))

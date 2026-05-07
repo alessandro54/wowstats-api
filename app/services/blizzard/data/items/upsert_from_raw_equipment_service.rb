@@ -23,19 +23,20 @@ module Blizzard
           # input rows target the same existing row.
           item_records = items.filter_map { |raw_item| build_item_record(raw_item) }
                               .uniq { |r| r[:blizzard_id] }
+                              .sort_by { |r| r[:blizzard_id] }
           return { "equipped_items" => {} } if item_records.empty?
 
           enchantment_source_blizzard_ids = items.filter_map { |raw_item|
             extract_enchantment_source_blizzard_id(raw_item)
-          }.uniq
+          }.uniq.sort
 
           socket_gem_blizzard_ids = items.flat_map { |raw_item|
             extract_socket_gem_blizzard_ids(raw_item)
-          }.uniq
+          }.uniq.sort
 
           enchantment_blizzard_ids = items.filter_map { |raw_item|
             extract_enchantment_blizzard_id(raw_item)
-          }.uniq
+          }.uniq.sort
 
           # rubocop:disable Rails/SkipsModelValidations
           with_deadlock_retry do
@@ -44,7 +45,7 @@ module Blizzard
 
           # Enchantment sources and socket gems are inserted as stubs — full metadata
           # (name, quality, class) is fetched later via a dedicated sync job.
-          stub_item_blizzard_ids = (enchantment_source_blizzard_ids + socket_gem_blizzard_ids).uniq -
+          stub_item_blizzard_ids = (enchantment_source_blizzard_ids + socket_gem_blizzard_ids).uniq.sort -
                                    item_records.map { |r| r[:blizzard_id] }
           Item.insert_all(
             stub_item_blizzard_ids.map { |id| { blizzard_id: id } },
@@ -315,7 +316,9 @@ module Blizzard
 
             return if records.empty?
 
-            unique_records = records.uniq { |r| [ r[:translatable_type], r[:translatable_id], r[:locale], r[:key] ] }
+            unique_records = records
+              .uniq { |r| [ r[:translatable_type], r[:translatable_id], r[:locale], r[:key] ] }
+              .sort_by { |r| [ r[:translatable_type], r[:translatable_id].to_s, r[:locale], r[:key] ] }
 
             # rubocop:disable Rails/SkipsModelValidations
             with_deadlock_retry do

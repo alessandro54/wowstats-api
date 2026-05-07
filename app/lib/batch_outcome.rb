@@ -34,21 +34,32 @@ class BatchOutcome
     all_entries.each_with_object(Hash.new(0)) { |entry, counts| counts[entry[:status]] += 1 }
   end
 
-  def summary_message(job_label:)
+  def summary_message(job_label:, cycle_id: nil, region: nil)
     succeeded = @successes.size
     failed    = @failures.size
-    breakdown = counts_by_status.map { |status, count| "#{status}: #{count}" }.join(", ")
+    breakdown = counts_by_status.map { |status, count| "#{status}=#{count}" }.join(" ")
 
-    msg = "[#{job_label}] Batch complete: #{succeeded}/#{total} succeeded, #{failed} failed. Breakdown: {#{breakdown}}"
+    ctx = [] # : Array[String]
+    ctx << "cycle=#{cycle_id}" if cycle_id
+    ctx << "region=#{region}"  if region
+    prefix = ctx.any? ? "[#{ctx.join(' ')}] " : ""
 
-    if @failures.any?
-      samples = @failures.first(5).map { |f| "#{f[:id]}: #{f[:error]}" }.join("; ")
-      msg += ". Failures: [#{samples}]"
-      msg += " (+#{failed - 5} more)" if failed > 5
-    end
-
+    msg = "#{prefix}[#{job_label}] #{succeeded}/#{total} ok  { #{breakdown} }"
+    msg += "  failed=#{failed}" if failed > 0
+    msg += failure_snippet if @failures.any?
     msg
   end
+
+  private
+
+    def failure_snippet
+      failed  = @failures.size
+      samples = @failures.first(5).map { |f| "char=#{f[:id]} err=#{f[:error]}" }.join(" | ")
+      suffix  = failed > 5 ? " (+#{failed - 5} more)" : ""
+      "  ⚠ #{samples}#{suffix}"
+    end
+
+  public
 
   def raise_if_total_failure!(job_label:)
     return unless total_failure?

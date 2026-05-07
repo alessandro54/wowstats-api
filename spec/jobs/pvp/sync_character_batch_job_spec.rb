@@ -208,7 +208,7 @@ RSpec.describe Pvp::SyncCharacterBatchJob, type: :job do
 
         perform_job
 
-        expect(Rails.logger).to have_received(:info).with(/Batch complete: 1\/2 succeeded, 1 failed/)
+        expect(Rails.logger).to have_received(:info).with(/\[SyncCharacterBatchJob\] 1\/2 ok/)
       end
     end
 

@@ -15,6 +15,10 @@ class BatchOutcome
   def total: () -> Integer
   def total_failure?: () -> bool
   def counts_by_status: () -> Hash[Symbol, Integer]
-  def summary_message: (job_label: String) -> String
+  def summary_message: (job_label: String, ?cycle_id: Integer?, ?region: String?) -> String
   def raise_if_total_failure!: (job_label: String) -> void
+
+  private
+
+  def failure_snippet: () -> String
 end

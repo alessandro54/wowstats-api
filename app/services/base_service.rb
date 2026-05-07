@@ -6,6 +6,10 @@ class BaseService
 
   private
 
+    def log_info(msg)  = Rails.logger.info("[#{self.class.name}] #{msg}")
+    def log_warn(msg)  = Rails.logger.warn("[#{self.class.name}] #{msg}")
+    def log_error(msg) = Rails.logger.error("[#{self.class.name}] #{msg}")
+
     def success(payload = nil, message: nil, context: {})
       ServiceResult.success(payload, message: message, context: context)
     end

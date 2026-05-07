@@ -15,6 +15,12 @@ module Pvp
     # Classic RBG is dead (<5k entries, noisy data). Overalls are redundant
     # because their characters are fully covered by the per-spec brackets.
     # See discovery/pvp/rbg-brackets.ipynb.
+    # Blizzard exposes "shuffle-overall" and "blitz-overall" bracket buckets
+    # but they're redundant — every character also appears in the per-spec
+    # brackets (shuffle-{class}-{spec}, blitz-{class}-{spec}) that already
+    # cover the full ladder. Skip them at sync time so we don't pull data
+    # we'll never read. Classic RBG is dead (<5k entries, noisy data).
+    # See discovery/pvp/rbg-brackets.ipynb.
     SKIP_BRACKETS = %w[shuffle-overall blitz-overall rbg].freeze
 
     EXPLICIT = {}.freeze
@@ -30,7 +36,7 @@ module Pvp
           :two_v_two
         when "3v3"
           :three_v_three
-        when "shuffle-overall", /\Ashuffle-/
+        when /\Ashuffle-/
           :shuffle_like
         when /\Ablitz-/
           :blitz_like

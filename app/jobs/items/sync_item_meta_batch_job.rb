@@ -27,7 +27,6 @@ module Items
         # rubocop:disable Rails/SkipsModelValidations
         item.update_columns(icon_url: icon_url, meta_synced_at: Time.current)
       rescue Blizzard::Client::NotFoundError
-        item.update_columns(meta_synced_at: Time.current)
         # rubocop:enable Rails/SkipsModelValidations
       rescue Blizzard::Client::Error => e
         Rails.logger.warn("[Items::SyncItemMetaBatchJob] Failed for item #{item.id}: #{e.message}")

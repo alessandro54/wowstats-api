@@ -1,0 +1,53 @@
+name: Contract Tests
+
+on:
+  schedule:
+    # Nightly at 09:15 UTC. Catches Blizzard API contract changes before
+    # the next prod sync runs against them.
+    - cron: '15 9 * * *'
+  workflow_dispatch: {}
+
+env:
+  RAILS_ENV: test
+  RUN_CONTRACT_TESTS: '1'
+
+jobs:
+  contract:
+    name: Blizzard API contract
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: wow_bis_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '4.0'
+          bundler-cache: true
+
+      - name: Setup database
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/wow_bis_test
+        run: bundle exec rails db:create db:migrate
+
+      - name: Run contract specs
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/wow_bis_test
+          BLIZZARD_CLIENT_ID: ${{ secrets.BLIZZARD_CLIENT_ID }}
+          BLIZZARD_CLIENT_SECRET: ${{ secrets.BLIZZARD_CLIENT_SECRET }}
+        run: bundle exec rspec spec/contract --tag contract --format documentation

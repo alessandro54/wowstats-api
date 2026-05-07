@@ -12,8 +12,8 @@ RSpec.describe Pvp::BuildAggregationsService, type: :service do
     allow(Pvp::Meta::EnchantAggregationService).to receive(:call).and_return(success_result)
     allow(Pvp::Meta::GemAggregationService).to     receive(:call).and_return(success_result)
     allow(Pvp::Meta::TalentAggregationService).to  receive(:call).and_return(success_result)
-    allow(Pvp::NotifyFrontendRevalidateService).to receive(:call)
-    allow(Pvp::PurgeStaleCharacterDataJob).to      receive(:perform_later)
+    allow(Pvp::WarmMetaCacheJob).to            receive(:perform_later)
+    allow(Pvp::PurgeStaleCharacterDataJob).to  receive(:perform_later)
     allow(Pvp::NotifyFailedCharactersJob).to        receive(:perform_later)
     allow(Pvp::SyncLogger).to                       receive(:cycle_complete)
     allow(Rails.cache).to                           receive(:increment)
@@ -68,8 +68,8 @@ RSpec.describe Pvp::BuildAggregationsService, type: :service do
       result
     end
 
-    it "notifies frontend revalidate" do
-      expect(Pvp::NotifyFrontendRevalidateService).to receive(:call)
+    it "enqueues cache warm job (which notifies frontend when done)" do
+      expect(Pvp::WarmMetaCacheJob).to receive(:perform_later)
       result
     end
   end
@@ -91,8 +91,8 @@ RSpec.describe Pvp::BuildAggregationsService, type: :service do
       expect(season.reload.live_pvp_sync_cycle_id).to be_nil
     end
 
-    it "does not notify frontend" do
-      expect(Pvp::NotifyFrontendRevalidateService).not_to receive(:call)
+    it "does not enqueue cache warm job" do
+      expect(Pvp::WarmMetaCacheJob).not_to receive(:perform_later)
       result
     end
 

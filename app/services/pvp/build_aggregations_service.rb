@@ -17,14 +17,14 @@ module Pvp
     def call
       season = PvpSeason.find_by(id: pvp_season_id)
       unless season
-        Rails.logger.warn("[BuildAggregationsService] Season #{pvp_season_id} not found, skipping")
+        log_warn("Season #{pvp_season_id} not found, skipping")
         return success(nil)
       end
 
       cycle = sync_cycle_id ? PvpSyncCycle.find_by(id: sync_cycle_id) : nil
 
       if cycle&.aborted?
-        Rails.logger.info("[BuildAggregationsService] Cycle ##{cycle.id} aborted — skipping aggregations")
+        log_info("Cycle ##{cycle.id} aborted — skipping aggregations")
         return success(nil)
       end
 
@@ -39,39 +39,41 @@ module Pvp
 
       attr_reader :pvp_season_id, :sync_cycle_id, :cycle_started_at
 
+      # rubocop:disable Metrics/AbcSize
       def run_aggregations(season, cycle)
-        results = []
-        mutex   = Mutex.new
-        work    = AGGREGATIONS.dup
+        results   = []
+        agg_start = Time.current
 
-        Array.new(AGGREGATIONS.size) do
-          Thread.new do
-            loop do
-              tuple = mutex.synchronize { work.shift }
-              break unless tuple
+        # Run services sequentially to avoid exhausting the DB connection pool.
+        # Each service already parallelises internally (bracket-level threads via
+        # run_per_bracket), so running 4 services in parallel would multiply the
+        # peak connection count by 4 and cause ConnectionTimeoutError.
+        AGGREGATIONS.each do |(key, service_class, _)|
+          results << run_single_aggregation(key, service_class, season, cycle)
+        end
 
-              key, service_class, = tuple
-              result = run_single_aggregation(key, service_class, season, cycle)
-              mutex.synchronize { results << result }
-            end
-          end
-        end.each(&:join)
-
+        log_aggregations_complete(cycle, agg_start)
         results.to_h
       end
 
       def run_single_aggregation(key, service_class, season, cycle)
-        result = service_class.call(season: season, cycle: cycle)
+        started     = Time.current
+        result      = service_class.call(season: season, cycle: cycle)
+        elapsed     = (Time.current - started).round
+        cycle_label = cycle ? "cycle=#{cycle.id} " : ""
+
         if result.success?
-          [ key, result.context[:count] ]
+          Pvp::Meta::TalentIntegrityCheckService.call(season: season, cycle: cycle) if key == :talents
+          count = result.context[:count]
+          Rails.logger.info("[#{cycle_label}aggregations] #{key}: #{count} records (#{format_elapsed(elapsed)})")
+          [ key, count ]
         else
-          Rails.logger.error(
-            "[BuildAggregationsService] #{service_class} failed for season #{season.id}: #{result.error}"
-          )
+          log_error("#{service_class} failed for season #{season.id}: #{result.error}")
           Pvp::SyncLogger.error("#{service_class} failed for season #{season.id}: #{result.error}")
           [ key, :failed ]
         end
       end
+      # rubocop:enable Metrics/AbcSize
 
       def finalize_without_cycle(results)
         Pvp::SyncLogger.aggregations_complete(**results.slice(:items, :enchants, :gems, :talents))
@@ -107,6 +109,7 @@ module Pvp
         bump_meta_cache
         Pvp::NotifyFrontendRevalidateService.call
         Pvp::WarmMetaCacheJob.perform_later
+        enqueue_unsynced_item_icons(season)
         log_sync_report(season, cycle, results)
         Pvp::PurgeStaleCharacterDataJob.perform_later
       end
@@ -129,12 +132,12 @@ module Pvp
 
       def bump_meta_cache
         Rails.cache.increment(Api::V1::BaseController::META_CACHE_VERSION_KEY)
-        Rails.logger.info("[BuildAggregationsService] Meta cache version bumped")
+        log_info("Meta cache version bumped")
       end
 
       def log_completion(results)
-        Rails.logger.info(
-          "[BuildAggregationsService] Season #{pvp_season_id} done — " \
+        log_info(
+          "Season #{pvp_season_id} done — " \
           "items: #{results[:items]}, enchants: #{results[:enchants]}, " \
           "gems: #{results[:gems]}, talents: #{results[:talents]}"
         )
@@ -162,10 +165,29 @@ module Pvp
         Pvp::NotifyFailedCharactersJob.perform_later(cycle.id, total: total, failed: failed)
       end
 
+      def enqueue_unsynced_item_icons(season)
+        item_ids = PvpMetaItemPopularity.where(pvp_season: season).distinct.pluck(:item_id) +
+                   PvpMetaGemPopularity.where(pvp_season: season).distinct.pluck(:item_id)
+        unsynced = Item.where(id: item_ids.uniq).reject(&:meta_synced?).map(&:id)
+        Items::SyncItemMetaBatchJob.perform_later(item_ids: unsynced) if unsynced.any?
+      end
+
       def elapsed_seconds
         return nil unless cycle_started_at
 
         Time.current - Time.zone.parse(cycle_started_at)
+      end
+
+      def log_aggregations_complete(cycle, agg_start)
+        elapsed     = (Time.current - agg_start).round
+        cycle_label = cycle ? "cycle=#{cycle.id} " : ""
+        Rails.logger.info("[#{cycle_label}aggregations] all done in #{format_elapsed(elapsed)}")
+      end
+
+      def format_elapsed(seconds)
+        return "#{seconds}s" if seconds < 60
+
+        "#{(seconds / 60).floor}m #{(seconds % 60)}s"
       end
   end
 end

@@ -161,15 +161,6 @@ module Pvp
 
           # Extra locale translations make HTTP API calls — must run OUTSIDE the DB transaction
           sync_extra_locale_translations if eq_changed && sync_done
-
-          return unless sync_done
-
-          logger.info(
-            "[SyncCharacterService] Processed character #{character.id} inline, " \
-            "updated #{entries.size} entries " \
-            "(equipment: #{eq_changed ? 'changed' : '304'}, " \
-            "talents: #{spec_fetch.changed? ? 'changed' : '304'})"
-          )
         end
         # rubocop:enable Metrics/MethodLength, Metrics/AbcSize
 

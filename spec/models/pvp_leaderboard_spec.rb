@@ -115,16 +115,16 @@ RSpec.describe PvpLeaderboard, type: :model do
       expect(PvpLeaderboard.for_bracket('2v2')).to contain_exactly(lb_2v2)
     end
 
-    it 'matches all blitz brackets for blitz-overall' do
-      expect(PvpLeaderboard.for_bracket('blitz-overall')).to contain_exactly(lb_blitz_sub, lb_blitz_fire)
+    it 'matches all blitz brackets for blitz aggregate' do
+      expect(PvpLeaderboard.for_bracket('blitz')).to contain_exactly(lb_blitz_sub, lb_blitz_fire)
     end
 
-    it 'matches all shuffle brackets for shuffle-overall' do
-      expect(PvpLeaderboard.for_bracket('shuffle-overall')).to contain_exactly(lb_shuffle_sub)
+    it 'matches all shuffle brackets for shuffle aggregate' do
+      expect(PvpLeaderboard.for_bracket('shuffle')).to contain_exactly(lb_shuffle_sub)
     end
 
     it 'does not mix blitz and shuffle' do
-      expect(PvpLeaderboard.for_bracket('blitz-overall')).not_to include(lb_shuffle_sub)
+      expect(PvpLeaderboard.for_bracket('blitz')).not_to include(lb_shuffle_sub)
     end
   end
 

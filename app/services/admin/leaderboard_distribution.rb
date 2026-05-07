@@ -1,5 +1,5 @@
 module Admin
-  class LeaderboardDistribution
+  class LeaderboardDistribution < BaseService
     CLASS_COLORS = {
       "warrior" => "#C79C6E",
       "paladin" => "#F58CBA",
@@ -16,7 +16,7 @@ module Admin
       "evoker" => "#33937F"
     }.freeze
 
-    REGULAR_ORDER = { "2v2" => 0, "3v3" => 1, "rbg" => 2, "blitz-overall" => 3 }.freeze
+    REGULAR_ORDER = { "2v2" => 0, "3v3" => 1, "rbg" => 2, "blitz" => 3 }.freeze
 
     def initialize(season)
       @season = season

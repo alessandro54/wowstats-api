@@ -38,9 +38,8 @@ class PvpMetaTalentPopularity < ApplicationRecord
   include MetaPopularityScopes
 
   self.table_name = "pvp_meta_talent_popularity"
+  self.meta_includes = { talent: :translations }
 
   belongs_to :pvp_season
   belongs_to :talent
-
-  meta_includes_for(talent: :translations)
 end

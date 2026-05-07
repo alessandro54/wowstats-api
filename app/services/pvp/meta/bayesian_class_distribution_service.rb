@@ -12,7 +12,7 @@ module Pvp
     # optimal (James-Stein) and adapts to season maturity automatically.
     #
     # See discovery/pvp/meta-scoring-study.ipynb for derivation and validation.
-    class BayesianClassDistributionService
+    class BayesianClassDistributionService < BaseService
       MIN_PLAYERS = 3
 
       # Role-dependent scoring weights: [rating, winrate, presence]
@@ -36,7 +36,7 @@ module Pvp
 
       DEFAULT_WEIGHTS = ARENA_WEIGHTS[:dps].freeze
 
-      SOLO_BRACKETS = %w[shuffle-overall blitz-overall].freeze
+      SOLO_BRACKETS = %w[shuffle blitz].freeze
 
       def initialize(season:, bracket:, region:, role: nil)
         @season  = season

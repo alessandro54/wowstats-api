@@ -92,6 +92,10 @@ RSpec.configure do |config|
   # To enable this behaviour uncomment the line below.
   # config.infer_spec_type_from_file_location!
 
+  # Contract specs hit live external APIs (Blizzard). Skipped by default;
+  # opt in via RUN_CONTRACT_TESTS=1 (used by the nightly CI workflow).
+  config.filter_run_excluding(:contract) unless ENV["RUN_CONTRACT_TESTS"] == "1"
+
   # Filter lines from Rails gems in backtraces.
   config.filter_rails_from_backtrace!
   # arbitrary gems may also be filtered via:
