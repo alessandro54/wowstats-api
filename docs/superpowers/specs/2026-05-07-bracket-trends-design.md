@@ -27,6 +27,7 @@ CREATE TABLE pvp_leaderboard_entry_snapshots (
   id                 BIGSERIAL PRIMARY KEY,
   character_id       BIGINT NOT NULL REFERENCES characters(id),
   pvp_leaderboard_id BIGINT NOT NULL REFERENCES pvp_leaderboards(id),
+  pvp_sync_cycle_id  BIGINT NULL REFERENCES pvp_sync_cycles(id),
   snapshot_at        TIMESTAMPTZ NOT NULL,
   rank               INTEGER NOT NULL,
   rating             INTEGER NOT NULL,
@@ -45,10 +46,14 @@ CREATE INDEX idx_snap_character_time
   ON pvp_leaderboard_entry_snapshots (character_id, snapshot_at DESC);
 ```
 
+`pvp_sync_cycle_id` is `NULL` for backfilled rows and ad-hoc syncs (`SyncBracketJob`); populated when a sync cycle context exists. Used for traceability and retroactive cleanup. Not indexed — ad-hoc lookups only.
+
+`spec_id` is denormalized from the entry. Redundant with `pvp_leaderboards.bracket` for shuffle/blitz (bracket name encodes spec) but cheap (4 B/row, ~11 MB total at saturation) and useful for 2v2/3v3 sparklines that want to label by the spec the char was running.
+
 ### Volume
 
 - 7-day retention × 4 cycles/day × 100k entries = ~2.8M rows steady-state.
-- ~120 B/row including indexes → ~336 MB → ~8.7% of current 3.88 GB DB.
+- ~128 B/row including indexes (with `pvp_sync_cycle_id` + `spec_id`) → ~360 MB → ~9% of current 3.88 GB DB.
 - Acceptable. Re-evaluate when total DB shrinks via other optimizations.
 
 ### Why FK to leaderboard, not entry
@@ -57,32 +62,46 @@ CREATE INDEX idx_snap_character_time
 
 ## Write path
 
-Snapshots written inside the existing `SyncLeaderboardService` transaction, after entry upsert, before `remove_dropped_entries`:
+Snapshots are derived data — primary leaderboard entries must not be lost over a snapshot bug. Snapshot insert lives in a **separate, isolated block** after the entry-upsert transaction commits. Failures are logged + sent to Sentry, not propagated.
 
 ```ruby
 ActiveRecord::Base.transaction do
   PvpLeaderboardEntry.upsert_all(entry_records, ...)
-
-  snapshot_records = entry_records.map { |r| ... }
-  PvpLeaderboardEntrySnapshot.insert_all(snapshot_records, on_duplicate: :skip)
-
   leaderboard.update!(last_synced_at: snapshot_at)
   remove_dropped_entries(leaderboard.id, character_ids)
 end
+
+# Snapshots: best-effort, isolated from primary writes
+begin
+  snapshot_records = entry_records.map { |r| build_snapshot(r, sync_cycle_id) }
+  inserted = PvpLeaderboardEntrySnapshot.insert_all(snapshot_records, on_duplicate: :skip)
+  Pvp::SyncLogger.snapshots_inserted(count: inserted.rows.size, leaderboard: leaderboard)
+rescue => e
+  Rails.logger.error("[SyncLeaderboardService] Snapshot insert failed: #{e.message}")
+  Sentry.capture_exception(e, extra: {
+    service: "SyncLeaderboardService",
+    leaderboard_id: leaderboard.id,
+    snapshot_at: snapshot_at
+  })
+end
 ```
 
-`on_duplicate: :skip` makes the insert idempotent under `with_deadlock_retry` re-runs.
+`on_duplicate: :skip` makes the insert idempotent if `SyncLeaderboardService` is re-invoked for the same `snapshot_at` (e.g., manual replay).
+
+`SyncLogger.snapshots_inserted` is a new helper logging count per leaderboard — surfaces silent breakage (zero inserts when nonzero expected).
 
 ### Deadlock analysis
+
+Since snapshot insert lives outside the primary txn:
 
 | Scenario | Verdict |
 |---|---|
 | Two parallel brackets writing snapshots for overlapping chars | Different `pvp_leaderboard_id` → no unique index conflict. Safe. |
 | Snapshot insert FK lock vs concurrent character UPDATE | PG 9.3+ uses `FOR KEY SHARE` for FK; character UPDATEs touch non-key columns → `FOR NO KEY UPDATE`. These don't conflict. Safe. |
-| Lock-hold time growth | ~50% longer (one extra `insert_all` of ~2500 rows). Other brackets wait on their own row, not this one. Acceptable. |
-| Idempotency under retry | `on_duplicate: :skip` avoids unique-violation on re-run. Safe. |
+| Snapshot insert blocks primary writes | Out of primary txn — primary `with_lock` already released. Zero blocking on entry path. |
+| Idempotency under retry | `on_duplicate: :skip` avoids unique-violation on manual replay. Safe. |
 
-No new deadlock paths. Existing `with_deadlock_retry` (5 attempts) handles transient.
+No new deadlock paths.
 
 ## Read path
 
@@ -179,12 +198,29 @@ prune_leaderboard_snapshots:
   schedule: every day at 3am UTC
 ```
 
-## First-cycle behavior
+## Day-0 backfill
 
-- No backfill needed. Feature degrades gracefully from day 0.
-- After 1 cycle: history exists, no delta yet.
-- After ~24h: leaderboard badges start populating (need a 24h-old baseline).
-- After ~7d: full sparkline depth on profile endpoint.
+Migration runs a one-shot backfill from current `pvp_leaderboard_entries` so the very first cycle after deploy already has a baseline (saves 6h of empty state):
+
+```sql
+INSERT INTO pvp_leaderboard_entry_snapshots
+  (character_id, pvp_leaderboard_id, pvp_sync_cycle_id, snapshot_at,
+   rank, rating, wins, losses, spec_id, created_at, updated_at)
+SELECT
+  e.character_id, e.pvp_leaderboard_id, NULL, e.snapshot_at,
+  e.rank, e.rating, e.wins, e.losses, e.spec_id, NOW(), NOW()
+FROM pvp_leaderboard_entries e
+ON CONFLICT (character_id, pvp_leaderboard_id, snapshot_at) DO NOTHING;
+```
+
+~100k rows, runs in <2s. `pvp_sync_cycle_id` is NULL since these snapshots predate cycle tracking.
+
+## Post-deploy timeline
+
+- After backfill: 1 snapshot per entry, all at the same `snapshot_at`.
+- After 1 cycle (~6h): second snapshot per entry, but still <24h old → no delta yet.
+- After ~24h (~4 cycles): 24h-baseline available, leaderboard badges populate.
+- After ~7d (~28 cycles): full sparkline depth on profile endpoint.
 
 Frontend handling:
 
@@ -230,9 +266,11 @@ Frontend handling:
 
 ### Edited
 
-- `app/services/pvp/leaderboards/sync_leaderboard_service.rb` — insert snapshots in txn.
+- `app/services/pvp/leaderboards/sync_leaderboard_service.rb` — insert snapshots in isolated rescue block; pass `sync_cycle_id` from caller.
+- `app/jobs/pvp/sync_current_season_leaderboards_job.rb` — pass `sync_cycle_id` into `SyncLeaderboardService`.
 - `app/controllers/api/v1/pvp/leaderboards_controller.rb` — merge deltas into entry response.
 - `app/serializers/...` — add `delta` field to leaderboard entry serializer.
+- `app/lib/pvp/sync_logger.rb` — add `snapshots_inserted` class method.
 - `config/routes.rb` — add `/api/v1/characters/:region/:realm/:name/trends`.
 - `config/recurring.yml` — add prune job.
 - `sig/` — RBS updates for new model + query class.
