@@ -36,3 +36,8 @@ production:
   purge_old_sync_cycles:
     command: "PvpSyncCycle.where(status: %w[completed failed aborted]).where('created_at < ?', 30.days.ago).delete_all"
     schedule: every day at 4am
+
+  prune_leaderboard_snapshots:
+    class: Pvp::PruneLeaderboardSnapshotsJob
+    queue: default
+    schedule: every day at 3am
