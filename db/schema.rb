@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_01_000001) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_07_073317) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -46,7 +46,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_01_000001) do
     t.string "talent_type", null: false
     t.datetime "updated_at", null: false
     t.index ["character_id", "spec_id"], name: "idx_character_talents_covering_for_agg", where: "(rank > 0)", include: ["talent_id"]
-    t.index ["character_id", "spec_id"], name: "idx_character_talents_on_char_spec"
     t.index ["character_id", "talent_id", "spec_id"], name: "idx_character_talents_on_char_talent_spec", unique: true
     t.index ["character_id", "talent_type"], name: "idx_character_talents_on_char_and_type"
     t.index ["spec_id", "talent_type", "talent_id"], name: "idx_character_talents_spec_type_talent"

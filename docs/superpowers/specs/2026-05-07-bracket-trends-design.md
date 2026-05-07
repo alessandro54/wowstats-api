@@ -7,14 +7,16 @@
 
 Track per-character per-bracket leaderboard history so the API can expose:
 
-1. **Leaderboard delta badge** — "▲5 +32 rating since last cycle" on each entry.
-2. **Profile sparkline** — rating/rank/W-L progression over the last 7 days.
+1. **Leaderboard delta badge** — "▲5 +32 rating in last 24h" on each entry. Inline on existing leaderboard endpoint.
+2. **Profile sparkline** — rating/rank/W-L progression over the last 7 days. Separate endpoint, fetched on-demand from profile view.
 
 ## Non-goals
 
 - Full-season history (>7 days). Out of scope until volume / UX justify.
+- 14d / 30d sparkline tiers. Future addition via daily-rollup table; not part of v1.
 - Per-cycle event log. Snapshots only — derived state, not event stream.
 - Backfilling existing leaderboard data into history. Feature starts producing data on deploy.
+- Sparkline payload bundled into leaderboard response. Considered, rejected — 2500 entries × 28 points ≈ 2 MB per leaderboard response, mostly wasted (users only view top rows). Sparkline lives on its own endpoint.
 
 ## Storage
 
@@ -84,24 +86,25 @@ No new deadlock paths. Existing `with_deadlock_retry` (5 attempts) handles trans
 
 ## Read path
 
-### Leaderboard delta
+### Leaderboard delta (24h)
 
 `GET /api/v1/pvp/:season/:region/leaderboards/:bracket` — extend response.
 
-Single CTE query keyed off `(pvp_leaderboard_id, snapshot_at DESC)` index:
+Single query keyed off `(pvp_leaderboard_id, snapshot_at DESC)` index. For each char on the leaderboard, find the most-recent snapshot at-or-before 24h ago, capped at 48h to avoid stale baselines:
 
 ```sql
-WITH ranked AS (
-  SELECT character_id, rank, rating, wins, losses,
-         ROW_NUMBER() OVER (PARTITION BY character_id ORDER BY snapshot_at DESC) AS rn
-  FROM pvp_leaderboard_entry_snapshots
-  WHERE pvp_leaderboard_id = :leaderboard_id
-)
-SELECT character_id, rank, rating, wins, losses
-FROM ranked WHERE rn = 2
+SELECT DISTINCT ON (character_id)
+  character_id, rank, rating, wins, losses, snapshot_at
+FROM pvp_leaderboard_entry_snapshots
+WHERE pvp_leaderboard_id = :leaderboard_id
+  AND snapshot_at <= NOW() - INTERVAL '24 hours'
+  AND snapshot_at >= NOW() - INTERVAL '48 hours'
+ORDER BY character_id, snapshot_at DESC
 ```
 
-Result hashed by `character_id`, merged into entry response as `delta: { rank, rating, wins, losses }`. `delta` is `null` when no prior snapshot exists.
+Result hashed by `character_id`, merged into entry response as `delta: { rank, rating, wins, losses }`. `delta` is `null` when no snapshot in the 24-48h window (char is new, was inactive, or first 24h post-deploy).
+
+Payload addition: ~16 B/entry × 2500 entries ≈ ~40 KB extra per response. Acceptable.
 
 ### Profile trends
 
@@ -180,8 +183,8 @@ prune_leaderboard_snapshots:
 
 - No backfill needed. Feature degrades gracefully from day 0.
 - After 1 cycle: history exists, no delta yet.
-- After 2 cycles (~12h): leaderboard badges start populating.
-- After 28 cycles (~7d): full sparkline depth.
+- After ~24h: leaderboard badges start populating (need a 24h-old baseline).
+- After ~7d: full sparkline depth on profile endpoint.
 
 Frontend handling:
 
@@ -192,7 +195,9 @@ Frontend handling:
 
 | Case | Behavior |
 |---|---|
-| Char drops off, returns later | Sparkline gap. Delta compares to last on-leaderboard snapshot (could be hours/days old). |
+| Char drops off, returns later | Sparkline gap. Delta is `null` if no snapshot in 24-48h window; otherwise compared to oldest qualifying snapshot. |
+| Char on leaderboard <24h | `delta: null` — too new for 24h baseline. |
+| Char inactive >48h | `delta: null` — baseline too stale to compare. |
 | Cycle aborted mid-sync | Some leaderboards have new snapshots, others don't. No corruption — snapshots are leaderboard-local. |
 | Manual `SyncBracketJob` re-sync | New `snapshot_at` → new snapshot row. Sparkline gets denser cluster. Acceptable. |
 | Shuffle dedup | `SyncLeaderboardService` dedupes by `character_id` (best rank kept) before insert. Snapshots inherit dedup. |
@@ -203,8 +208,9 @@ Frontend handling:
 
 - **Model:** `spec/models/pvp_leaderboard_entry_snapshot_spec.rb` — associations, unique constraint.
 - **Service:** extend `spec/services/pvp/leaderboards/sync_leaderboard_service_spec.rb` — snapshots created with matching `snapshot_at`; idempotent under retry; survives entry deletion.
+- **Query:** `spec/services/pvp/leaderboards/leaderboard_deltas_query_spec.rb` — picks snapshot in 24-48h window; null when out of window or absent.
 - **Controllers:**
-  - `spec/requests/api/v1/pvp/leaderboards_spec.rb` — delta field present when prior snapshot exists, null otherwise.
+  - `spec/requests/api/v1/pvp/leaderboards_spec.rb` — delta field present when 24h baseline exists, null otherwise.
   - `spec/requests/api/v1/characters/trends_spec.rb` — arrays per bracket, 7d window enforced, cache key respected.
 - **Job:** `spec/jobs/pvp/prune_leaderboard_snapshots_job_spec.rb` — deletes only past cutoff, batches correctly.
 
