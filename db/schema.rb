@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_07_073317) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_07_173712) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -151,6 +151,26 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_07_073317) do
     t.index ["pvp_leaderboard_id"], name: "index_pvp_leaderboard_entries_on_pvp_leaderboard_id"
     t.index ["rank"], name: "index_pvp_leaderboard_entries_on_rank"
     t.index ["tier_set_id"], name: "index_pvp_leaderboard_entries_on_tier_set_id"
+  end
+
+  create_table "pvp_leaderboard_entry_snapshots", force: :cascade do |t|
+    t.bigint "character_id", null: false
+    t.datetime "created_at", null: false
+    t.integer "losses", null: false
+    t.bigint "pvp_leaderboard_id", null: false
+    t.bigint "pvp_sync_cycle_id"
+    t.integer "rank", null: false
+    t.integer "rating", null: false
+    t.datetime "snapshot_at", null: false
+    t.integer "spec_id"
+    t.datetime "updated_at", null: false
+    t.integer "wins", null: false
+    t.index ["character_id", "pvp_leaderboard_id", "snapshot_at"], name: "idx_snap_unique", unique: true
+    t.index ["character_id", "snapshot_at"], name: "idx_snap_character_time", order: { snapshot_at: :desc }
+    t.index ["character_id"], name: "index_pvp_leaderboard_entry_snapshots_on_character_id"
+    t.index ["pvp_leaderboard_id", "snapshot_at"], name: "idx_snap_leaderboard_time", order: { snapshot_at: :desc }
+    t.index ["pvp_leaderboard_id"], name: "index_pvp_leaderboard_entry_snapshots_on_pvp_leaderboard_id"
+    t.index ["pvp_sync_cycle_id"], name: "index_pvp_leaderboard_entry_snapshots_on_pvp_sync_cycle_id"
   end
 
   create_table "pvp_leaderboards", force: :cascade do |t|
@@ -355,6 +375,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_07_073317) do
   add_foreign_key "character_talents", "talents"
   add_foreign_key "pvp_leaderboard_entries", "characters"
   add_foreign_key "pvp_leaderboard_entries", "pvp_leaderboards"
+  add_foreign_key "pvp_leaderboard_entry_snapshots", "characters"
+  add_foreign_key "pvp_leaderboard_entry_snapshots", "pvp_leaderboards"
+  add_foreign_key "pvp_leaderboard_entry_snapshots", "pvp_sync_cycles"
   add_foreign_key "pvp_leaderboards", "pvp_seasons"
   add_foreign_key "pvp_meta_enchant_popularity", "enchantments"
   add_foreign_key "pvp_meta_enchant_popularity", "pvp_seasons"
