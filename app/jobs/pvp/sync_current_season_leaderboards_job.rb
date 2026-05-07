@@ -2,10 +2,6 @@ module Pvp
   class SyncCurrentSeasonLeaderboardsJob < ApplicationJob
     queue_as :default
 
-    # Max simultaneous Blizzard HTTP calls during leaderboard discovery + sync.
-    # Raise via PVP_LEADERBOARD_CONCURRENCY env var if rate limits allow.
-    MAX_LEADERBOARD_CONCURRENCY = ENV.fetch("PVP_LEADERBOARD_CONCURRENCY", 10).to_i
-
     # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
     def perform(locale: "en_US")
       if (active = PvpSyncCycle.active)
@@ -60,7 +56,7 @@ module Pvp
       # Phase 2: Sync all brackets across all regions concurrently (parallel HTTP).
       # A character that appears in 2v2 AND shuffle is the same record —
       # dedup within the region so it is only fetched from Blizzard once.
-      character_ids_by_region = sync_all_leaderboards_concurrently(season, brackets_by_region, snapshot_at)
+      character_ids_by_region = sync_all_leaderboards_concurrently(season, brackets_by_region, snapshot_at, sync_cycle)
       Pvp::RegionConfig::REGIONS.each { |r| character_ids_by_region[r]&.uniq! }
 
       # Phase 3: Filter recently synced, build batches, enqueue per-region.
@@ -101,7 +97,7 @@ module Pvp
       # Returns Hash[region => [character_id, ...]] (not yet deduped).
       # Uses threads for the same reason as discover_all_brackets_concurrently.
       # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
-      def sync_all_leaderboards_concurrently(season, brackets_by_region, snapshot_at)
+      def sync_all_leaderboards_concurrently(season, brackets_by_region, snapshot_at, sync_cycle)
         tasks = Pvp::RegionConfig::REGIONS.flat_map do |region|
           default       = { brackets: [], locale: Pvp::RegionConfig::REGION_LOCALES[region] }
           info          = brackets_by_region.fetch(region, default)
@@ -112,13 +108,15 @@ module Pvp
         character_ids_by_region = Hash.new { |h, k| h[k] = [] }
         return character_ids_by_region if tasks.empty?
 
-        results = run_with_threads(tasks, concurrency: [ tasks.size, MAX_LEADERBOARD_CONCURRENCY ].min) do |task|
+        concurrency = [ tasks.size, Pvp::SyncConfig::LEADERBOARD_CONCURRENCY ].min
+        results = run_with_threads(tasks, concurrency: concurrency) do |task|
           result = Pvp::Leaderboards::SyncLeaderboardService.call(
-            season:      season,
-            bracket:     task[:bracket],
-            region:      task[:region],
-            locale:      task[:locale],
-            snapshot_at: snapshot_at
+            season:        season,
+            bracket:       task[:bracket],
+            region:        task[:region],
+            locale:        task[:locale],
+            snapshot_at:   snapshot_at,
+            sync_cycle_id: sync_cycle.id
           )
           { region: task[:region], ids: result.context[:character_ids] } if result.success?
         rescue StandardError => e
@@ -159,7 +157,7 @@ module Pvp
       # returns [region_batch_map, total_batches].
       # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
       def build_region_batch_map(character_ids_by_region)
-        batch_size       = ENV.fetch("PVP_SYNC_BATCH_SIZE", 50).to_i
+        batch_size       = Pvp::SyncConfig::SYNC_BATCH_SIZE
         region_batch_map = {}
         total_batches    = 0
 

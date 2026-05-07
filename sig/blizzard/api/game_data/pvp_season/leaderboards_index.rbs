@@ -1,0 +1,16 @@
+module Blizzard
+  module Api
+    module GameData
+      module PvpSeason
+        class LeaderboardsIndex < Blizzard::Api::BaseRequest
+          def self.fetch: (
+            pvp_season_id: Integer,
+            ?region: String,
+            ?locale: String,
+            ?params: Hash[Symbol, untyped]
+          ) -> Hash[Symbol, untyped]
+        end
+      end
+    end
+  end
+end

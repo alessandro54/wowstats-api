@@ -1,0 +1,22 @@
+module Wow
+  module Catalog
+    type spec_data = { spec_slug: String, class_id: Integer, class_slug: String, role: Symbol }
+
+    SPECS: Hash[Integer, spec_data]
+    CLASS_INDEX: Hash[Integer, String]
+
+    def self.spec_slug: (Integer | String | nil spec_id) -> String?
+    def self.class_id_for_spec: (Integer | String | nil spec_id) -> Integer?
+    def self.class_slug_for_spec: (Integer | String | nil spec_id) -> String?
+    def self.role_for_spec: (Integer | String | nil spec_id) -> Symbol?
+    def self.class_slug: (Integer | String | nil class_id) -> String?
+    def self.normalize_spec_id: (Integer | String | nil spec_id) -> Integer?
+    def self.normalize_class_id: (Integer | String | nil class_id) -> Integer?
+    def self.all_specs_with_slugs: () -> Array[Hash[Symbol, untyped]]
+    def self.spec_id_from_bracket: (String? bracket) -> Integer?
+
+    private
+
+    def self.normalize_integer_id: (untyped value) -> Integer?
+  end
+end

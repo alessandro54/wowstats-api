@@ -16,6 +16,9 @@ Rails.application.routes.draw do
     namespace :v1 do
       resources :characters, only: [ :index ]
       get "characters/:region/:realm/:name", to: "characters#show", as: :character_profile
+      get "characters/:region/:realm/:name/trends",
+          to: "characters/trends#show",
+          as: :character_trends
 
       namespace :pvp do
         scope ":season/:region", as: "season_region_bracket" do

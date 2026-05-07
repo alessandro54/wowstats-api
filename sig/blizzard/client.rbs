@@ -25,9 +25,18 @@ module Blizzard
     attr_reader locale: String
     attr_reader region: String
 
-    def initialize: (region: String, locale: String, ?auth: Auth) -> void
+    def initialize: (?region: String, ?locale: String, ?auth: Auth) -> void
 
-    def get: (String path, namespace: String, params: Hash[Symbol, untyped]) -> Hash[Symbol, untyped]
+    def self.default_locale_for: (String | Symbol region) -> String
+
+    def get: (String path, namespace: String, ?params: Hash[Symbol, untyped]) -> Hash[Symbol, untyped]
+
+    def get_with_last_modified: (
+      String path,
+      namespace: String,
+      ?params: Hash[Symbol, untyped],
+      ?last_modified: String?
+    ) -> [Hash[Symbol, untyped]?, String?, bool]
 
     def profile_namespace: -> String
     def static_namespace: -> String

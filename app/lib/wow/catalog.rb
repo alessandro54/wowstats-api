@@ -63,26 +63,36 @@ module Wow
 
     def self.spec_slug(spec_id)
       key = normalize_spec_id(spec_id)
+      return nil unless key
+
       SPECS[key]&.fetch(:spec_slug, nil)
     end
 
     def self.class_id_for_spec(spec_id)
       key = normalize_spec_id(spec_id)
+      return nil unless key
+
       SPECS[key]&.fetch(:class_id, nil)
     end
 
     def self.class_slug_for_spec(spec_id)
       key = normalize_spec_id(spec_id)
+      return nil unless key
+
       SPECS[key]&.fetch(:class_slug, nil)
     end
 
     def self.role_for_spec(spec_id)
       key = normalize_spec_id(spec_id)
+      return nil unless key
+
       SPECS[key]&.fetch(:role, nil)
     end
 
     def self.class_slug(class_id)
       key = normalize_class_id(class_id)
+      return nil unless key
+
       CLASS_INDEX[key]
     end
 
@@ -115,8 +125,8 @@ module Wow
       match = bracket&.match(/\A(?:shuffle|blitz)-(.+)-(.+)\z/)
       return nil unless match
 
-      class_slug = match[1].tr("-", "_")
-      spec_slug  = match[2]
+      class_slug = match[1].to_s.tr("-", "_")
+      spec_slug  = match[2].to_s
 
       SPECS.find { |_id, data|
         data[:class_slug] == class_slug && data[:spec_slug] == spec_slug

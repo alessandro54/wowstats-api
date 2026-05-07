@@ -4,7 +4,14 @@ class Api::V1::Pvp::LeaderboardsController < Api::V1::BaseController
   before_action :set_season, :set_leaderboard, only: [ :show ]
 
   def show
-    render json: @leaderboard.get_top_n(10, spec_id: spec_id_param)
+    entries = @leaderboard.get_top_n(10, spec_id: spec_id_param)
+    deltas  = Pvp::Leaderboards::LeaderboardDeltasQuery.new(@leaderboard.id).call
+
+    payload = entries.map do |entry|
+      Pvp::LeaderboardEntrySerializer.new(entry, delta: deltas[entry.character_id]).call
+    end
+
+    render json: payload
   end
 
   private

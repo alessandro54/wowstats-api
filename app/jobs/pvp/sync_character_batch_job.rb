@@ -3,15 +3,6 @@ module Pvp
     self.enqueue_after_transaction_commit = :always
     queue_as :character_sync_us # overridden per-region via .set(queue:) when enqueued
 
-    CONCURRENCY = ENV.fetch("PVP_SYNC_CONCURRENCY", 15).to_i
-    # Threads per SolidQueue worker process for character_sync queues.
-    # Must match PVP_SYNC_THREADS in queue.yml so the DB pool math is correct.
-    THREADS     = ENV.fetch("PVP_SYNC_THREADS", 8).to_i
-    # Number of parallel OS processes per region queue (PVP_CHARACTER_SYNC_PROCESSES
-    # in queue.yml). safe_concurrency multiplies by this so total peak DB connections
-    # across all processes stays within DB_POOL.
-    PROCESSES   = ENV.fetch("PVP_CHARACTER_SYNC_PROCESSES", 1).to_i
-
     retry_on Blizzard::Client::Error, wait: :exponentially_longer, attempts: 3 do |_job, error|
       Rails.logger.warn("[SyncCharacterBatchJob] API error, will retry: #{error.message}")
     end
@@ -65,8 +56,9 @@ module Pvp
 
         # Both region workers (US + EU) run in the same OS process and share DB_POOL.
         # Divide by REGIONS.size so the total peak across all workers stays within the pool.
-        total_threads = THREADS * PROCESSES * Pvp::RegionConfig::REGIONS.size
-        concurrency   = safe_concurrency(CONCURRENCY, characters.size, threads: total_threads)
+        total_threads = Pvp::SyncConfig::SYNC_THREADS * Pvp::SyncConfig::CHARACTER_SYNC_PROCESSES *
+                        Pvp::RegionConfig::REGIONS.size
+        concurrency   = safe_concurrency(Pvp::SyncConfig::SYNC_CONCURRENCY, characters.size, threads: total_threads)
 
         run_with_threads(characters, concurrency: concurrency) do |character|
           sync_one(

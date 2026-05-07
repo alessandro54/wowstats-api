@@ -87,6 +87,17 @@ module Net
   end
 end
 
+# CGI (stdlib, used by Blizzard profile services)
+class CGI
+  def self.escape: (String) -> String
+end
+
+# Sentry (gem)
+module Sentry
+  def self.capture_exception: (Exception, ?extra: Hash[untyped, untyped]) -> void
+  def self.configure_scope: () { (untyped) -> void } -> void
+end
+
 # App-internal class used in ApplicationJob
 class JobPerformanceMonitor
   def self.track_job_performance: (untyped, Float, ?success: bool, ?error: untyped) -> void

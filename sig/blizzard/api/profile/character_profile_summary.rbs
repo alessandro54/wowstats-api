@@ -1,13 +1,14 @@
 module Blizzard
   module Api
     module Profile
-      class CharacterProfileSummary
+      class CharacterProfileSummary < BaseRequest
         def self.fetch: (
-            region: String,
-            name: String,
-            real: String,
-            locale: String,
-            params: Hash[Symbol, untyped]) -> Hash[Symbol, untyped]
+          region: String,
+          name: String,
+          realm: String,
+          ?locale: String,
+          ?params: Hash[Symbol, untyped]
+        ) -> Hash[Symbol, untyped]
       end
     end
   end

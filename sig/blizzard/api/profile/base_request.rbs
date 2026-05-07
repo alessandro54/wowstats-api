@@ -1,0 +1,28 @@
+module Blizzard
+  module Api
+    module Profile
+      class BaseRequest < Blizzard::Api::BaseRequest
+        def self.fetch_profile: (
+          region: String,
+          name: String,
+          realm: String,
+          ?locale: String,
+          ?params: Hash[Symbol, untyped],
+          ?suffix: String?
+        ) -> Hash[Symbol, untyped]
+
+        def self.fetch_profile_with_last_modified: (
+          region: String,
+          name: String,
+          realm: String,
+          ?locale: String,
+          ?last_modified: String?,
+          ?params: Hash[Symbol, untyped],
+          ?suffix: String?
+        ) -> [Hash[Symbol, untyped]?, String?, bool]
+
+        def self.character_path: (String realm, String name, ?String? suffix) -> String
+      end
+    end
+  end
+end

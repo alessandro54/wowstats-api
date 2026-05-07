@@ -3,7 +3,7 @@ module Pvp
     class CharacterStatsService < BaseService
       include AggregationSql
 
-      TOP_N = ENV.fetch("PVP_META_TOP_N", 1000).to_i
+      TOP_N = Pvp::SyncConfig::META_TOP_N
 
       def initialize(season:, bracket:, spec_id:, top_n: TOP_N)
         @season   = season

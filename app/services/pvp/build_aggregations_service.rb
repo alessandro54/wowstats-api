@@ -107,6 +107,7 @@ module Pvp
           purge_old_cycle_data(old_cycle_id) if old_cycle_id
         end
         bump_meta_cache
+        Pvp::NotifyFrontendRevalidateService.call
         Pvp::WarmMetaCacheJob.perform_later
         enqueue_unsynced_item_icons(season)
         log_sync_report(season, cycle, results)

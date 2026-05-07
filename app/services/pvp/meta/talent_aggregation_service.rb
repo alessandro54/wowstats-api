@@ -4,7 +4,7 @@ module Pvp
     class TalentAggregationService < BaseService
       include AggregationSql
 
-      TOP_N = ENV.fetch("PVP_META_TOP_N", 1000).to_i
+      TOP_N = Pvp::SyncConfig::META_TOP_N
 
       BIS_THRESHOLD         = TalentTierClassifier::BIS_THRESHOLD
       SITUATIONAL_THRESHOLD = TalentTierClassifier::SITUATIONAL_THRESHOLD

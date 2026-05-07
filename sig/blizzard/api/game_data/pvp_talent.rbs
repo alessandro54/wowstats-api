@@ -1,0 +1,13 @@
+module Blizzard
+  module Api
+    module GameData
+      class PvpTalent < Blizzard::Api::BaseRequest
+        def self.fetch: (
+          blizzard_id: Integer,
+          ?region: String,
+          ?locale: String
+        ) -> Hash[Symbol, untyped]
+      end
+    end
+  end
+end
