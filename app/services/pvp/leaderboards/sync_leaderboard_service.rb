@@ -1,12 +1,13 @@
 module Pvp
   module Leaderboards
     class SyncLeaderboardService < ApplicationService
-      def initialize(season:, bracket:, region:, locale: "en_US", snapshot_at: Time.current)
-        @season      = season
-        @bracket     = bracket
-        @region      = region
-        @locale      = locale
-        @snapshot_at = snapshot_at
+      def initialize(season:, bracket:, region:, locale: "en_US", snapshot_at: Time.current, sync_cycle_id: nil)
+        @season         = season
+        @bracket        = bracket
+        @region         = region
+        @locale         = locale
+        @snapshot_at    = snapshot_at
+        @sync_cycle_id  = sync_cycle_id
       end
 
       # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
@@ -65,6 +66,8 @@ module Pvp
 
         char_id_map = upsert_result.rows.to_h { |row| [ row[0].to_s, row[1] ] }
 
+        entry_records = []
+
         # rubocop:disable Metrics/BlockLength
         with_deadlock_retry do
           leaderboard = PvpLeaderboard.find_or_create_by!(
@@ -77,7 +80,7 @@ module Pvp
 
           leaderboard.with_lock do
             now = Time.current
-            entry_records = entries.map do |entry_json|
+            built_records = entries.map do |entry_json|
               character_data = entry_json.fetch("character")
               stats          = entry_json.fetch("season_match_statistics")
 
@@ -99,7 +102,7 @@ module Pvp
 
             # Deduplicate by character_id — shuffle-overall leaderboards return the
             # same character once per spec ranking.  Keep the best placement (lowest rank).
-            entry_records = entry_records
+            built_records = built_records
               .group_by { |r| r[:character_id] }
               .transform_values { |dupes| dupes.min_by { |r| r[:rank] } }
               .values
@@ -110,7 +113,7 @@ module Pvp
 
               # rubocop:disable Rails/SkipsModelValidations
               PvpLeaderboardEntry.upsert_all(
-                entry_records,
+                built_records,
                 unique_by:   %i[character_id pvp_leaderboard_id],
                 update_only: update_cols
               )
@@ -121,9 +124,13 @@ module Pvp
 
               remove_dropped_entries(leaderboard.id, character_ids)
             end
+
+            entry_records = built_records
           end
         end
         # rubocop:enable Metrics/BlockLength
+
+        write_snapshots(entry_records)
 
         Rails.logger.info(
           "[SyncLeaderboardService] #{region}/#{bracket}: " \
@@ -136,7 +143,7 @@ module Pvp
 
       private
 
-        attr_reader :season, :bracket, :region, :locale, :snapshot_at
+        attr_reader :season, :bracket, :region, :locale, :snapshot_at, :sync_cycle_id
 
         def faction_enum(type)
           return nil unless type
@@ -146,6 +153,48 @@ module Pvp
           when "HORDE"    then 1
           end
         end
+
+        # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
+        def write_snapshots(entry_records)
+          return if entry_records.blank?
+
+          rows = entry_records.map do |r|
+            {
+              character_id:       r[:character_id],
+              pvp_leaderboard_id: r[:pvp_leaderboard_id],
+              pvp_sync_cycle_id:  sync_cycle_id,
+              snapshot_at:        snapshot_at,
+              rank:               r[:rank],
+              rating:             r[:rating],
+              wins:               r[:wins],
+              losses:             r[:losses],
+              spec_id:            r[:spec_id],
+              created_at:         Time.current,
+              updated_at:         Time.current
+            }
+          end
+
+          # rubocop:disable Rails/SkipsModelValidations
+          inserted = PvpLeaderboardEntrySnapshot.insert_all(
+            rows,
+            unique_by: %i[character_id pvp_leaderboard_id snapshot_at],
+            returning: false
+          )
+          # rubocop:enable Rails/SkipsModelValidations
+          count = inserted.respond_to?(:rows) ? inserted.rows.size : rows.size
+          leaderboard = PvpLeaderboard.find_by(pvp_season_id: season.id, region: region, bracket: bracket)
+          Pvp::SyncLogger.snapshots_inserted(count: count, leaderboard: leaderboard) if leaderboard
+        rescue => e
+          Rails.logger.error("[SyncLeaderboardService] Snapshot insert failed: #{e.message}")
+          Sentry.capture_exception(e, extra: {
+            service:       "SyncLeaderboardService",
+            region:        region,
+            bracket:       bracket,
+            snapshot_at:   snapshot_at,
+            sync_cycle_id: sync_cycle_id
+          })
+        end
+        # rubocop:enable Metrics/MethodLength, Metrics/AbcSize
 
         # Delete entries for characters no longer present on the leaderboard.
         def remove_dropped_entries(leaderboard_id, active_character_ids)
