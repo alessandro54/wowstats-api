@@ -144,5 +144,50 @@ RSpec.describe "Api::V1::Pvp::Leaderboards", type: :request do
         expect(response).to have_http_status(:not_found)
       end
     end
+
+    context "with a 24h baseline snapshot" do
+      let!(:leaderboard) {
+        create(:pvp_leaderboard, pvp_season: current_season, bracket: "3v3", region: "us")
+      }
+      let!(:char) { create(:character) }
+
+      before do
+        create(:pvp_leaderboard_entry,
+               character:       char,
+               pvp_leaderboard: leaderboard,
+               spec_id:         251,
+               rank:            1, rating: 2800, wins: 50, losses: 20)
+        create(:pvp_leaderboard_entry_snapshot,
+               character: char, pvp_leaderboard: leaderboard,
+               snapshot_at: 30.hours.ago,
+               rank:        5, rating: 2700, wins: 40, losses: 18)
+      end
+
+      it "includes delta on the entry" do
+        get "/api/v1/pvp/#{current_season.blizzard_id}/us/leaderboards/3v3", params: { spec_id: 251 }
+        expect(response).to have_http_status(:ok)
+        entry = JSON.parse(response.body).first
+        expect(entry["delta"]).to eq(
+          "rank" => -4,
+          "rating" => 100,
+          "wins" => 10,
+          "losses" => 2
+        )
+      end
+    end
+
+    context "with no baseline snapshot" do
+      let!(:leaderboard) {
+        create(:pvp_leaderboard, pvp_season: current_season, bracket: "3v3", region: "us")
+      }
+      let!(:entry) {
+        create(:pvp_leaderboard_entry, pvp_leaderboard: leaderboard, spec_id: 251, rank: 1, rating: 2800)
+      }
+
+      it "returns delta as null" do
+        get "/api/v1/pvp/#{current_season.blizzard_id}/us/leaderboards/3v3", params: { spec_id: 251 }
+        expect(JSON.parse(response.body).first["delta"]).to be_nil
+      end
+    end
   end
 end
