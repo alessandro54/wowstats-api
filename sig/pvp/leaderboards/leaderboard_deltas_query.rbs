@@ -1,0 +1,8 @@
+module Pvp
+  module Leaderboards
+    class LeaderboardDeltasQuery
+      def initialize: (Integer leaderboard_id, ?now: Time) -> void
+      def call: () -> Hash[Integer, { rank: Integer, rating: Integer, wins: Integer, losses: Integer }]
+    end
+  end
+end

@@ -6,7 +6,8 @@ module Pvp
         bracket: String,
         region: String,
         ?locale: String,
-        ?snapshot_at: Time
+        ?snapshot_at: Time,
+        ?sync_cycle_id: Integer?
       ) -> void
 
       def call: () -> ServiceResult
