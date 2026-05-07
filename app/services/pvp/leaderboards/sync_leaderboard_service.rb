@@ -67,6 +67,7 @@ module Pvp
         char_id_map = upsert_result.rows.to_h { |row| [ row[0].to_s, row[1] ] }
 
         entry_records = []
+        leaderboard   = nil
 
         # rubocop:disable Metrics/BlockLength
         with_deadlock_retry do
@@ -130,7 +131,7 @@ module Pvp
         end
         # rubocop:enable Metrics/BlockLength
 
-        write_snapshots(entry_records)
+        write_snapshots(entry_records, leaderboard)
 
         Rails.logger.info(
           "[SyncLeaderboardService] #{region}/#{bracket}: " \
@@ -155,7 +156,7 @@ module Pvp
         end
 
         # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
-        def write_snapshots(entry_records)
+        def write_snapshots(entry_records, leaderboard)
           return if entry_records.blank?
 
           rows = entry_records.map do |r|
@@ -178,12 +179,11 @@ module Pvp
           inserted = PvpLeaderboardEntrySnapshot.insert_all(
             rows,
             unique_by: %i[character_id pvp_leaderboard_id snapshot_at],
-            returning: false
+            returning: [ :id ]
           )
           # rubocop:enable Rails/SkipsModelValidations
-          count = inserted.respond_to?(:rows) ? inserted.rows.size : rows.size
-          leaderboard = PvpLeaderboard.find_by(pvp_season_id: season.id, region: region, bracket: bracket)
-          Pvp::SyncLogger.snapshots_inserted(count: count, leaderboard: leaderboard) if leaderboard
+          count = inserted.rows.size
+          Pvp::SyncLogger.snapshots_inserted(count: count, leaderboard: leaderboard)
         rescue => e
           Rails.logger.error("[SyncLeaderboardService] Snapshot insert failed: #{e.message}")
           Sentry.capture_exception(e, extra: {
