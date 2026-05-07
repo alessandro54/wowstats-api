@@ -38,6 +38,11 @@ class CreatePvpLeaderboardEntrySnapshots < ActiveRecord::Migration[8.1]
         e.character_id, e.pvp_leaderboard_id, NULL, e.snapshot_at,
         e.rank, e.rating, e.wins, e.losses, e.spec_id, NOW(), NOW()
       FROM pvp_leaderboard_entries e
+      WHERE e.snapshot_at IS NOT NULL
+        AND e.rank        IS NOT NULL
+        AND e.rating      IS NOT NULL
+        AND e.wins        IS NOT NULL
+        AND e.losses      IS NOT NULL
       ON CONFLICT (character_id, pvp_leaderboard_id, snapshot_at) DO NOTHING;
     SQL
   end
