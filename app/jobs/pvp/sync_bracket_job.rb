@@ -46,7 +46,7 @@ module Pvp
       bracket_config = Pvp::BracketConfig.for(bracket)
       job_queue = bracket_config&.dig(:job_queue) || :character_sync
 
-      batch_size = ENV.fetch("PVP_SYNC_BATCH_SIZE", 50).to_i
+      batch_size = Pvp::SyncConfig::SYNC_BATCH_SIZE
       characters_to_sync.each_slice(batch_size) do |character_id_batch|
         Pvp::SyncCharacterBatchJob
           .set(queue: job_queue)

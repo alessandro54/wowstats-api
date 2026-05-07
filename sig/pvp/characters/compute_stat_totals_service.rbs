@@ -1,0 +1,11 @@
+module Pvp
+  module Characters
+    class ComputeStatTotalsService < BaseService
+      SECONDARY_STATS: Array[String]
+      STAT_PATTERNS: Hash[String, Regexp]
+
+      def initialize: (character: Character, spec_id: Integer) -> void
+      def call: () -> ServiceResult
+    end
+  end
+end

@@ -33,6 +33,7 @@
 #  index_characters_on_blizzard_id_and_region     (blizzard_id,region) UNIQUE
 #  index_characters_on_is_private                 (is_private) WHERE (is_private = true)
 #  index_characters_on_name_and_realm_and_region  (name,realm,region)
+#  index_characters_on_stat_pcts                  (stat_pcts) USING gin
 #  index_characters_on_unavailable_until_active   (unavailable_until) WHERE (unavailable_until IS NOT NULL)
 #
 

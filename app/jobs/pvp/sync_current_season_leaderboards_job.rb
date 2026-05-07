@@ -2,10 +2,6 @@ module Pvp
   class SyncCurrentSeasonLeaderboardsJob < ApplicationJob
     queue_as :default
 
-    # Max simultaneous Blizzard HTTP calls during leaderboard discovery + sync.
-    # Raise via PVP_LEADERBOARD_CONCURRENCY env var if rate limits allow.
-    MAX_LEADERBOARD_CONCURRENCY = ENV.fetch("PVP_LEADERBOARD_CONCURRENCY", 10).to_i
-
     # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
     def perform(locale: "en_US")
       if (active = PvpSyncCycle.active)
@@ -98,7 +94,8 @@ module Pvp
         character_ids_by_region = Hash.new { |h, k| h[k] = [] }
         return character_ids_by_region if tasks.empty?
 
-        results = run_with_threads(tasks, concurrency: [ tasks.size, MAX_LEADERBOARD_CONCURRENCY ].min) do |task|
+        concurrency = [ tasks.size, Pvp::SyncConfig::LEADERBOARD_CONCURRENCY ].min
+        results = run_with_threads(tasks, concurrency: concurrency) do |task|
           result = Pvp::Leaderboards::SyncLeaderboardService.call(
             season:      season,
             bracket:     task[:bracket],
@@ -145,7 +142,7 @@ module Pvp
       # returns [region_batch_map, total_batches].
       # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
       def build_region_batch_map(character_ids_by_region)
-        batch_size       = ENV.fetch("PVP_SYNC_BATCH_SIZE", 50).to_i
+        batch_size       = Pvp::SyncConfig::SYNC_BATCH_SIZE
         region_batch_map = {}
         total_batches    = 0
 

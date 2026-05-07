@@ -33,16 +33,12 @@
 #  fk_rails_...  (pvp_sync_cycle_id => pvp_sync_cycles.id)
 #
 class PvpMetaEnchantPopularity < ApplicationRecord
+  include MetaPopularityScopes
+
   self.table_name = "pvp_meta_enchant_popularity"
 
   belongs_to :pvp_season
   belongs_to :enchantment
 
-  scope :for_meta, ->(season:, bracket:, spec_id:) {
-    live_cycle_id = season.live_pvp_sync_cycle_id
-    base = includes(enchantment: :translations)
-             .where(pvp_season: season, bracket:, spec_id:)
-             .order(usage_pct: :desc)
-    live_cycle_id ? base.where(pvp_sync_cycle_id: live_cycle_id) : base
-  }
+  meta_includes_for(enchantment: :translations)
 end

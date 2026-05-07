@@ -35,16 +35,12 @@
 #  fk_rails_...  (talent_id => talents.id)
 #
 class PvpMetaTalentPopularity < ApplicationRecord
+  include MetaPopularityScopes
+
   self.table_name = "pvp_meta_talent_popularity"
 
   belongs_to :pvp_season
   belongs_to :talent
 
-  scope :for_meta, ->(season:, bracket:, spec_id:) {
-    live_cycle_id = season.live_pvp_sync_cycle_id
-    base = includes(talent: :translations)
-             .where(pvp_season: season, bracket:, spec_id:)
-             .order(usage_pct: :desc)
-    live_cycle_id ? base.where(pvp_sync_cycle_id: live_cycle_id) : base
-  }
+  meta_includes_for(talent: :translations)
 end

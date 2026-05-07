@@ -207,13 +207,5 @@ class TelegramCommandHandler
       "█" * filled + "░" * (width - filled)
     end
 
-    def format_elapsed(seconds)
-      seconds = seconds.abs
-      return "#{seconds.round(0)}s" if seconds < 60
-      return "#{(seconds / 60).floor}m #{(seconds % 60).round}s" if seconds < 3600
-
-      h = (seconds / 3600).floor
-      m = ((seconds % 3600) / 60).round
-      "#{h}h #{m}m"
-    end
+    def format_elapsed(seconds) = Pvp::Formatters.elapsed(seconds)
 end

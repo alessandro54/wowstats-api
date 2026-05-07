@@ -1,0 +1,24 @@
+module Blizzard
+  module Api
+    module Profile
+      class CharacterSpecializationSummary < BaseRequest
+        def self.fetch: (
+          region: String,
+          name: String,
+          realm: String,
+          ?locale: String,
+          ?params: Hash[Symbol, untyped]
+        ) -> Hash[Symbol, untyped]
+
+        def self.fetch_with_last_modified: (
+          region: String,
+          name: String,
+          realm: String,
+          ?locale: String,
+          ?last_modified: String?,
+          ?params: Hash[Symbol, untyped]
+        ) -> [Hash[Symbol, untyped]?, String?, bool]
+      end
+    end
+  end
+end

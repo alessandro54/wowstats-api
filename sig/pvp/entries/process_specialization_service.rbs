@@ -1,0 +1,13 @@
+module Pvp
+  module Entries
+    class ProcessSpecializationService < BaseService
+      def initialize: (
+        character: Character,
+        raw_specialization: Hash[String, untyped],
+        ?locale: String
+      ) -> void
+
+      def call: () -> ServiceResult
+    end
+  end
+end

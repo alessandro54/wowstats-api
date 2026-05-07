@@ -1,7 +1,7 @@
 module Blizzard
   module Api
     module Profile
-      class CharacterStatisticsSummary < Blizzard::Api::BaseRequest
+      class CharacterStatisticsSummary < BaseRequest
         SECONDARY_STAT_KEYS = {
           "HASTE_RATING" => ->(s) {
  { pct: s.dig("melee_haste", "rating_bonus"), rating: s.dig("melee_haste", "rating") } },
@@ -13,12 +13,7 @@ module Blizzard
         }.freeze
 
         def self.fetch(region:, name:, realm:, locale: "en_US", params: {})
-          client     = client(region:, locale:)
-          realm_slug = CGI.escape(realm.downcase)
-          name_slug  = CGI.escape(name.downcase)
-          client.get("/profile/wow/character/#{realm_slug}/#{name_slug}/statistics",
-                     namespace: client.profile_namespace,
-                     params:    params)
+          fetch_profile(region:, name:, realm:, locale:, params:, suffix: "statistics")
         end
 
         # Extracts secondary stat data from raw statistics response.

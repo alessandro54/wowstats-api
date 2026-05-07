@@ -126,13 +126,7 @@ module Pvp
       TelegramNotifier.send("🚨 <b>Sync error</b>\n<code>#{message}</code>")
     end
 
-    private_class_method def self.format_elapsed(seconds)
-      return "#{seconds.round(1)}s" if seconds < 60
-
-      m = (seconds / 60).floor
-      s = (seconds % 60).round
-      "#{m}m #{s}s"
-    end
+    private_class_method def self.format_elapsed(seconds) = Pvp::Formatters.elapsed_short(seconds)
 
     private_class_method def self.telegram_cycle_complete_message(cycle, season_name, char_line, counts, elapsed)
       agg = "items=#{counts[:items]}  enchants=#{counts[:enchants]}  gems=#{counts[:gems]}  talents=#{counts[:talents]}"

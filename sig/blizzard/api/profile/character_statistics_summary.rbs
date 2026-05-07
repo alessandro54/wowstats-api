@@ -1,0 +1,19 @@
+module Blizzard
+  module Api
+    module Profile
+      class CharacterStatisticsSummary < BaseRequest
+        SECONDARY_STAT_KEYS: Hash[String, ^(Hash[String, untyped]) -> { pct: untyped, rating: untyped }]
+
+        def self.fetch: (
+          region: String,
+          name: String,
+          realm: String,
+          ?locale: String,
+          ?params: Hash[Symbol, untyped]
+        ) -> Hash[Symbol, untyped]
+
+        def self.extract_stat_pcts: (untyped raw) -> Hash[String, Hash[String, Numeric]]
+      end
+    end
+  end
+end

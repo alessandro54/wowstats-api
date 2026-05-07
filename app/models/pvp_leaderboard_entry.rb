@@ -27,6 +27,9 @@
 #
 # Indexes
 #
+#  idx_entries_for_talent_player_count                     (pvp_leaderboard_id,spec_id,character_id) WHERE (specialization_processed_at IS NOT NULL)
+#  idx_entries_top_chars_equipment                         (pvp_leaderboard_id,character_id,rating DESC) WHERE ((spec_id IS NOT NULL) AND (equipment_processed_at IS NOT NULL))
+#  idx_entries_top_chars_specialization                    (pvp_leaderboard_id,character_id,rating DESC) WHERE ((spec_id IS NOT NULL) AND (specialization_processed_at IS NOT NULL))
 #  idx_entries_unique_char_leaderboard                     (character_id,pvp_leaderboard_id) UNIQUE
 #  index_entries_for_batch_processing                      (id,equipment_processed_at)
 #  index_entries_for_spec_meta                             (pvp_leaderboard_id,spec_id,rating)

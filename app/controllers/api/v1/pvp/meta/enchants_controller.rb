@@ -1,5 +1,5 @@
 class Api::V1::Pvp::Meta::EnchantsController < Api::V1::BaseController
-  before_action :validate_params!
+  include MetaParams
 
   def index
     cache_key = meta_cache_key("enchants", bracket_param, spec_id_param, slot_param, locale_param)
@@ -9,15 +9,6 @@ class Api::V1::Pvp::Meta::EnchantsController < Api::V1::BaseController
   end
 
   private
-
-    def validate_params!
-      validate_bracket!(params.require(:bracket)) or return
-      validate_spec_id!(params.require(:spec_id)) or return
-    end
-
-    def bracket_param = @bracket_param ||= params.require(:bracket)
-    def spec_id_param = @spec_id_param ||= params.require(:spec_id).to_i
-    def slot_param    = @slot_param    ||= validate_slot(params[:slot])
 
     def serialize_enchants_response
       season   = meta_season_for(PvpMetaEnchantPopularity)

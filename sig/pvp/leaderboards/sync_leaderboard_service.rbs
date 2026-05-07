@@ -1,0 +1,15 @@
+module Pvp
+  module Leaderboards
+    class SyncLeaderboardService < ApplicationService
+      def initialize: (
+        season: PvpSeason,
+        bracket: String,
+        region: String,
+        ?locale: String,
+        ?snapshot_at: Time
+      ) -> void
+
+      def call: () -> ServiceResult
+    end
+  end
+end

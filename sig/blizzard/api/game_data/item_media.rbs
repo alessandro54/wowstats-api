@@ -1,0 +1,12 @@
+module Blizzard
+  module Api
+    module GameData
+      class ItemMedia < Blizzard::Api::BaseRequest
+        def self.fetch: (
+          blizzard_id: Integer,
+          ?region: String
+        ) -> Hash[Symbol, untyped]
+      end
+    end
+  end
+end

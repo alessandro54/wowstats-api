@@ -17,9 +17,8 @@
 #
 # Indexes
 #
-#  index_talents_on_blizzard_id                  (blizzard_id) UNIQUE
-#  index_talents_on_node_id                      (node_id)
-#  index_talents_on_talent_type_and_blizzard_id  (talent_type,blizzard_id)
+#  index_talents_on_blizzard_id  (blizzard_id) UNIQUE
+#  index_talents_on_node_id      (node_id)
 #
 class Talent < ApplicationRecord
   include Translatable

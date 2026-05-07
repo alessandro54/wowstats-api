@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_22_031915) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_01_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -45,9 +45,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_22_031915) do
     t.bigint "talent_id", null: false
     t.string "talent_type", null: false
     t.datetime "updated_at", null: false
+    t.index ["character_id", "spec_id"], name: "idx_character_talents_covering_for_agg", where: "(rank > 0)", include: ["talent_id"]
     t.index ["character_id", "spec_id"], name: "idx_character_talents_on_char_spec"
     t.index ["character_id", "talent_id", "spec_id"], name: "idx_character_talents_on_char_talent_spec", unique: true
     t.index ["character_id", "talent_type"], name: "idx_character_talents_on_char_and_type"
+    t.index ["spec_id", "talent_type", "talent_id"], name: "idx_character_talents_spec_type_talent"
     t.index ["talent_id"], name: "index_character_talents_on_talent_id"
   end
 
@@ -78,6 +80,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_22_031915) do
     t.index ["blizzard_id", "region"], name: "index_characters_on_blizzard_id_and_region", unique: true
     t.index ["is_private"], name: "index_characters_on_is_private", where: "(is_private = true)"
     t.index ["name", "realm", "region"], name: "index_characters_on_name_and_realm_and_region"
+    t.index ["stat_pcts"], name: "index_characters_on_stat_pcts", using: :gin
     t.index ["unavailable_until"], name: "index_characters_on_unavailable_until_active", where: "(unavailable_until IS NOT NULL)"
   end
 
@@ -141,7 +144,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_22_031915) do
     t.index ["character_id"], name: "index_pvp_leaderboard_entries_on_character_id"
     t.index ["hero_talent_tree_id"], name: "index_pvp_leaderboard_entries_on_hero_talent_tree_id"
     t.index ["id", "equipment_processed_at"], name: "index_entries_for_batch_processing"
+    t.index ["pvp_leaderboard_id", "character_id", "rating"], name: "idx_entries_top_chars_equipment", order: { rating: :desc }, where: "((spec_id IS NOT NULL) AND (equipment_processed_at IS NOT NULL))"
+    t.index ["pvp_leaderboard_id", "character_id", "rating"], name: "idx_entries_top_chars_specialization", order: { rating: :desc }, where: "((spec_id IS NOT NULL) AND (specialization_processed_at IS NOT NULL))"
     t.index ["pvp_leaderboard_id", "rating"], name: "index_entries_on_leaderboard_and_rating"
+    t.index ["pvp_leaderboard_id", "spec_id", "character_id"], name: "idx_entries_for_talent_player_count", where: "(specialization_processed_at IS NOT NULL)"
     t.index ["pvp_leaderboard_id", "spec_id", "rating"], name: "index_entries_for_spec_meta"
     t.index ["pvp_leaderboard_id"], name: "index_pvp_leaderboard_entries_on_pvp_leaderboard_id"
     t.index ["rank"], name: "index_pvp_leaderboard_entries_on_rank"
@@ -294,6 +300,24 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_22_031915) do
     t.index ["talent_id", "spec_id"], name: "index_talent_spec_assignments_on_talent_id_and_spec_id", unique: true
   end
 
+  create_table "talent_sync_runs", force: :cascade do |t|
+    t.datetime "completed_at"
+    t.jsonb "counts", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.text "error_message"
+    t.jsonb "failed_specs", default: [], null: false
+    t.boolean "force", default: false, null: false
+    t.string "locale", null: false
+    t.string "region", null: false
+    t.jsonb "regression", default: {}, null: false
+    t.datetime "started_at", null: false
+    t.string "status", default: "running", null: false
+    t.jsonb "tsa_counts", default: {}, null: false
+    t.datetime "updated_at", null: false
+    t.index ["started_at"], name: "index_talent_sync_runs_on_started_at"
+    t.index ["status", "started_at"], name: "index_talent_sync_runs_on_status_and_started_at"
+  end
+
   create_table "talents", force: :cascade do |t|
     t.bigint "blizzard_id", null: false
     t.datetime "created_at", null: false
@@ -307,7 +331,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_22_031915) do
     t.datetime "updated_at", null: false
     t.index ["blizzard_id"], name: "index_talents_on_blizzard_id", unique: true
     t.index ["node_id"], name: "index_talents_on_node_id"
-    t.index ["talent_type", "blizzard_id"], name: "index_talents_on_talent_type_and_blizzard_id"
   end
 
   create_table "translations", force: :cascade do |t|

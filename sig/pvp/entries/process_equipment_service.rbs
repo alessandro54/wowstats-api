@@ -1,0 +1,16 @@
+module Pvp
+  module Entries
+    class ProcessEquipmentService < BaseService
+      EXCLUDED_SLOTS: Array[String]
+
+      def initialize: (
+        character: Character,
+        raw_equipment: Hash[String, untyped],
+        spec_id: Integer,
+        ?locale: String
+      ) -> void
+
+      def call: () -> ServiceResult
+    end
+  end
+end

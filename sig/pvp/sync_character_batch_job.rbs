@@ -1,0 +1,36 @@
+module Pvp
+  class SyncCharacterBatchJob < ApplicationJob
+    @sync_cycle_id: Integer?
+
+    def perform: (
+      character_ids: Array[Integer],
+      ?locale: String,
+      ?sync_cycle_id: Integer?
+    ) -> void
+
+    private
+
+    def process_characters_concurrently: (
+      Array[Character] characters,
+      String locale,
+      BatchOutcome outcome
+    ) -> void
+
+    def batch_load_eq_fallbacks: (Array[Integer] character_ids) -> Hash[Integer, PvpLeaderboardEntry]
+    def batch_load_spec_fallbacks: (Array[Integer] character_ids) -> Hash[Integer, PvpLeaderboardEntry]
+    def batch_load_entries: (Array[Integer] character_ids) -> Hash[Integer, Array[PvpLeaderboardEntry]]
+
+    def sync_one: (
+      character: Character,
+      locale: String,
+      outcome: BatchOutcome,
+      ?entries: Array[PvpLeaderboardEntry]?,
+      ?eq_fallback_source: PvpLeaderboardEntry?,
+      ?spec_fallback_source: PvpLeaderboardEntry?
+    ) -> void
+
+    def cycle_aborted?: (Integer? sync_cycle_id) -> bool
+    def enqueue_meta_sync_for_stale: (Array[Integer] character_ids) -> void
+    def track_sync_cycle_completion: () -> void
+  end
+end

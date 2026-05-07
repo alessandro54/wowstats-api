@@ -1,0 +1,12 @@
+module Pvp
+  module BracketConfig
+    type bracket_settings = { top_n: Integer, job_queue: Symbol }
+
+    FAMILY_DEFAULTS: Hash[Symbol, bracket_settings]
+    SKIP_BRACKETS: Array[String]
+    EXPLICIT: Hash[String?, bracket_settings]
+
+    def self.for: (String? bracket) -> bracket_settings?
+    def for: (String? bracket) -> bracket_settings?
+  end
+end
