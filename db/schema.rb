@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_07_173712) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_08_011758) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -76,6 +76,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_07_173712) do
     t.datetime "talents_last_modified", precision: nil
     t.datetime "unavailable_until"
     t.datetime "updated_at", null: false
+    t.index "lower((region)::text), lower((realm)::text), lower((name)::text)", name: "idx_characters_lower_region_realm_name"
     t.index ["blizzard_id", "region"], name: "index_characters_on_blizzard_id_and_region", unique: true
     t.index ["is_private"], name: "index_characters_on_is_private", where: "(is_private = true)"
     t.index ["name", "realm", "region"], name: "index_characters_on_name_and_realm_and_region"
