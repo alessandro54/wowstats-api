@@ -6,7 +6,7 @@ gem "avo"
 gem "rails", "~> 8.1.1"
 
 # Boot-time caching for faster startup
-gem "bootsnap", "~> 1.19", require: false
+gem "bootsnap", "~> 1.24", require: false
 
 # Fiber-based cooperative concurrency (replaces thread pools)
 gem "async", "~> 2.39"
