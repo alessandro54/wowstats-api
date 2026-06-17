@@ -45,9 +45,9 @@ gem "solid_cache"          # Rails.cache backed by PostgreSQL
 gem "solid_queue"          # Background jobs backed by PostgreSQL
 
 # RAG pipeline
-gem "neighbor"             # pgvector wrapper for ActiveRecord
-gem "ruby-openai", "~> 8.0"  # OpenAI embeddings (text-embedding-3-small, 1536 dims)
-gem "anthropic", "~> 0.4"    # Claude generation (insights endpoint)
+gem "anthropic", "~> 0.4" # Claude generation (insights endpoint)
+gem "neighbor" # pgvector wrapper for ActiveRecord
+gem "ruby-openai", "~> 8.0" # OpenAI embeddings (text-embedding-3-small, 1536 dims)
 
 
 # Timezone data for Windows/JRuby
