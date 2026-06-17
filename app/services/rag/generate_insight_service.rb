@@ -19,7 +19,7 @@ module Rag
       user_message = build_user_message
       response = client.messages(
         parameters: {
-          model:      "claude-opus-4-8",
+          model:      ENV.fetch("ANTHROPIC_MODEL", "claude-opus-4-8"),
           system:     SYSTEM_PROMPT,
           messages:   [ { role: "user", content: user_message } ],
           max_tokens: 1024

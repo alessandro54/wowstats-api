@@ -11,7 +11,7 @@ module Rag
       return failure("Empty text") if @text.blank?
 
       response = client.embeddings(
-        parameters: { model: MODEL, input: @text.truncate(MAX_INPUT_CHARS) }
+        parameters: { model: MODEL, input: @text[0...MAX_INPUT_CHARS] }
       )
       vector = response.dig("data", 0, "embedding")
       return failure("No embedding returned") unless vector
