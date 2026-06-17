@@ -4,6 +4,7 @@
 # Database name: primary
 #
 #  id                :bigint           not null, primary key
+#  embedding         :vector(1536)
 #  key               :string           not null
 #  locale            :string           not null
 #  meta              :jsonb            not null
@@ -19,8 +20,11 @@
 #  index_translations_on_locale                           (locale)
 #  index_translations_on_translatable                     (translatable_type,translatable_id)
 #  index_translations_on_translatable_and_locale_and_key  (translatable_type,translatable_id,locale,key) UNIQUE
+#  translations_embedding_idx                             (embedding) USING ivfflat
 #
 class Translation < ApplicationRecord
+  has_neighbors :embedding
+
   belongs_to :translatable, polymorphic: true
 
   validates :locale, :key, :value, :meta, presence: true
@@ -30,4 +34,9 @@ class Translation < ApplicationRecord
   scope :for_translatable, ->(translatable) {
     where(translatable_type: translatable.class.name, translatable_id: translatable.id)
   }
+  scope :talent_descriptions, -> {
+    where(translatable_type: "Talent", key: "description", locale: "en_US")
+      .where.not(value: [ nil, "" ])
+  }
+  scope :needs_embedding, -> { where(embedding: nil) }
 end

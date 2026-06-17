@@ -34,6 +34,8 @@ class EnsureMetaTranslationsJob < ApplicationJob
           data = Blizzard::Api::GameData::Item.fetch(blizzard_id: item.blizzard_id, locale: locale)
           name = data["name"]
           item.set_translation("name", locale, name, meta: { source: "blizzard" }) if name.present?
+          desc = data["description"]
+          item.set_translation("description", locale, desc, meta: { source: "blizzard" }) if desc.present?
         end
       rescue Blizzard::Client::Error => e
         Rails.logger.warn("[EnsureMetaTranslationsJob] Item #{item.blizzard_id} failed: #{e.message}")

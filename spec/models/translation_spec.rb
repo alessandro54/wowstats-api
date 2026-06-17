@@ -4,6 +4,7 @@
 # Database name: primary
 #
 #  id                :bigint           not null, primary key
+#  embedding         :vector(1536)
 #  key               :string           not null
 #  locale            :string           not null
 #  meta              :jsonb            not null
@@ -19,6 +20,7 @@
 #  index_translations_on_locale                           (locale)
 #  index_translations_on_translatable                     (translatable_type,translatable_id)
 #  index_translations_on_translatable_and_locale_and_key  (translatable_type,translatable_id,locale,key) UNIQUE
+#  translations_embedding_idx                             (embedding) USING ivfflat
 #
 require 'rails_helper'
 

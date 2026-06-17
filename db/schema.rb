@@ -10,9 +10,10 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_08_011758) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_17_030000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+  enable_extension "vector"
 
   create_table "character_items", force: :cascade do |t|
     t.integer "bonus_list", default: [], array: true
@@ -49,7 +50,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_08_011758) do
     t.index ["character_id", "talent_id", "spec_id"], name: "idx_character_talents_on_char_talent_spec", unique: true
     t.index ["character_id", "talent_type"], name: "idx_character_talents_on_char_and_type"
     t.index ["spec_id", "talent_type", "talent_id"], name: "idx_character_talents_spec_type_talent"
-    t.index ["talent_id"], name: "index_character_talents_on_talent_id"
   end
 
   create_table "characters", force: :cascade do |t|
@@ -116,6 +116,26 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_08_011758) do
     t.index ["job_class", "created_at"], name: "index_job_performance_metrics_on_job_class_and_created_at"
     t.index ["job_class"], name: "index_job_performance_metrics_on_job_class"
     t.index ["success"], name: "index_job_performance_metrics_on_success"
+  end
+
+  create_table "knowledge_documents", force: :cascade do |t|
+    t.string "category"
+    t.text "content"
+    t.datetime "created_at", null: false
+    t.vector "embedding", limit: 1536
+    t.string "external_id", null: false
+    t.datetime "external_updated_at"
+    t.datetime "fetched_at"
+    t.jsonb "metadata", default: {}, null: false
+    t.datetime "published_at"
+    t.string "source", null: false
+    t.string "title", null: false
+    t.datetime "updated_at", null: false
+    t.string "url", null: false
+    t.index ["embedding"], name: "knowledge_documents_embedding_idx", opclass: :vector_cosine_ops, using: :ivfflat
+    t.index ["external_updated_at"], name: "index_knowledge_documents_on_external_updated_at"
+    t.index ["fetched_at"], name: "index_knowledge_documents_on_fetched_at"
+    t.index ["source", "external_id"], name: "index_knowledge_documents_on_source_and_external_id", unique: true
   end
 
   create_table "pvp_leaderboard_entries", force: :cascade do |t|
@@ -355,6 +375,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_08_011758) do
 
   create_table "translations", force: :cascade do |t|
     t.datetime "created_at", null: false
+    t.vector "embedding", limit: 1536
     t.string "key", null: false
     t.string "locale", null: false
     t.jsonb "meta", default: {}, null: false
@@ -362,6 +383,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_08_011758) do
     t.string "translatable_type", null: false
     t.datetime "updated_at", null: false
     t.text "value", null: false
+    t.index ["embedding"], name: "translations_embedding_idx", opclass: :vector_cosine_ops, using: :ivfflat
     t.index ["key"], name: "index_translations_on_key"
     t.index ["locale"], name: "index_translations_on_locale"
     t.index ["translatable_type", "translatable_id", "locale", "key"], name: "index_translations_on_translatable_and_locale_and_key", unique: true

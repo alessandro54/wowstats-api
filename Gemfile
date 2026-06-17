@@ -40,9 +40,14 @@ gem "rack-attack", "~> 6.7"
 gem "propshaft", "~> 1.3"
 
 # PostgreSQL-backed ActionCable, Rails.cache, background jobs
-gem "solid_cable"          # ActionCable over PostgreSQL
+gem "solid_cable", "~> 3.0" # ActionCable over PostgreSQL (pinned: 4.0 has breaking changes)
 gem "solid_cache"          # Rails.cache backed by PostgreSQL
 gem "solid_queue"          # Background jobs backed by PostgreSQL
+
+# RAG pipeline
+gem "neighbor"             # pgvector wrapper for ActiveRecord
+gem "ruby-openai", "~> 8.0"  # OpenAI embeddings (text-embedding-3-small, 1536 dims)
+gem "anthropic", "~> 0.4"    # Claude generation (insights endpoint)
 
 
 # Timezone data for Windows/JRuby

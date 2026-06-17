@@ -42,6 +42,7 @@ Rails.application.routes.draw do
           get :class_distribution, to: "class_distributions#show"
           get :top_players, to: "top_players#index"
           get :stat_priority, to: "stat_priority#show"
+          get "insights/explain", to: "insights#explain"
         end
       end
     end
