@@ -30,6 +30,7 @@
 #
 # Indexes
 #
+#  idx_characters_lower_region_realm_name         (lower((region)::text), lower((realm)::text), lower((name)::text))
 #  index_characters_on_blizzard_id_and_region     (blizzard_id,region) UNIQUE
 #  index_characters_on_is_private                 (is_private) WHERE (is_private = true)
 #  index_characters_on_name_and_realm_and_region  (name,realm,region)

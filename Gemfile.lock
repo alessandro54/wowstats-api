@@ -84,6 +84,10 @@ GEM
     annotaterb (4.22.0)
       activerecord (>= 6.0.0)
       activesupport (>= 6.0.0)
+    anthropic (0.4.1)
+      event_stream_parser (>= 0.3.0, < 2.0.0)
+      faraday (>= 1)
+      faraday-multipart (>= 1)
     ast (2.4.3)
     async (2.39.0)
       console (~> 1.29)
@@ -145,6 +149,7 @@ GEM
     erubi (1.13.1)
     et-orbi (1.4.0)
       tzinfo
+    event_stream_parser (1.0.0)
     factory_bot (6.5.6)
       activesupport (>= 6.1.0)
     factory_bot_rails (6.5.1)
@@ -152,6 +157,14 @@ GEM
       railties (>= 6.1.0)
     faker (3.8.0)
       i18n (>= 1.8.11, < 2)
+    faraday (2.14.3)
+      faraday-net_http (>= 2.0, < 3.5)
+      json
+      logger
+    faraday-multipart (1.2.0)
+      multipart-post (~> 2.0)
+    faraday-net_http (3.4.4)
+      net-http (~> 0.5)
     ffi (1.17.4-aarch64-linux-gnu)
     ffi (1.17.4-aarch64-linux-musl)
     ffi (1.17.4-arm-linux-gnu)
@@ -230,6 +243,11 @@ GEM
       stimulus-rails
       turbo-rails
     msgpack (1.8.0)
+    multipart-post (2.4.1)
+    neighbor (1.2.0)
+      activerecord (>= 7.2)
+    net-http (0.9.1)
+      uri (>= 0.11.1)
     net-imap (0.6.3)
       date
       net-protocol
@@ -400,6 +418,10 @@ GEM
     rubocop-rspec (3.9.0)
       lint_roller (~> 1.1)
       rubocop (~> 1.81)
+    ruby-openai (8.3.0)
+      event_stream_parser (>= 0.3.0, < 2.0.0)
+      faraday (>= 1)
+      faraday-multipart (>= 1)
     ruby-progressbar (1.13.0)
     securerandom (0.4.1)
     sentry-rails (6.5.0)
@@ -500,6 +522,7 @@ PLATFORMS
 DEPENDENCIES
   amazing_print (~> 2.0)
   annotaterb (~> 4.20)
+  anthropic (~> 0.4)
   async (~> 2.39)
   avo
   bootsnap (~> 1.19)
@@ -515,6 +538,7 @@ DEPENDENCIES
   lefthook
   lograge (~> 0.14)
   mission_control-jobs (~> 1.1)
+  neighbor
   oj (~> 3.17)
   openssl
   pg (~> 1.6)
@@ -528,11 +552,12 @@ DEPENDENCIES
   rubocop-rails-omakase (~> 1.1)
   rubocop-rake
   rubocop-rspec
+  ruby-openai (~> 8.0)
   sentry-rails
   sentry-ruby
   shoulda-matchers (~> 7.0)
   simplecov (~> 0.22)
-  solid_cable
+  solid_cable (~> 3.0)
   solid_cache
   solid_queue
   steep

@@ -12,6 +12,7 @@ module Pvp
 
       stale.in_batches(of: BATCH_SIZE) do |batch|
         char_ids = batch.pluck(:id)
+        PvpLeaderboardEntrySnapshot.where(character_id: char_ids).delete_all
         CharacterTalent.where(character_id: char_ids).delete_all
         CharacterItem.where(character_id: char_ids).delete_all
         Character.where(id: char_ids).delete_all
