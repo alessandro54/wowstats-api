@@ -45,7 +45,7 @@ module Pvp
       )
 
       Pvp::SyncLogger.start_cycle(
-        cycle_id:    sync_cycle.id,
+        cycle:       sync_cycle,
         season_name: season.display_name,
         regions:     Pvp::RegionConfig::REGIONS
       )

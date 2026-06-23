@@ -30,14 +30,14 @@ module Pvp
 
     # ── Cycle start ──────────────────────────────────────────────────────────
 
-    def self.start_cycle(cycle_id:, season_name:, regions:)
+    def self.start_cycle(cycle:, season_name:, regions:)
       logger.info(SEPARATOR)
       logger.info(
-        "SYNC CYCLE ##{cycle_id} STARTED  |  Season: #{season_name}  |  Regions: #{regions.join(', ')}"
+        "SYNC CYCLE ##{cycle.id} STARTED  |  Season: #{season_name}  |  Regions: #{regions.join(', ')}"
       )
       logger.info(SEPARATOR)
-      TelegramNotifier.send(
-        "🔄 <b>Sync started</b>\nCycle ##{cycle_id} — #{season_name}\nRegions: #{regions.join(', ')}"
+      cycle.notify_telegram(
+        "🔄 <b>Sync started</b>\nCycle ##{cycle.id} — #{season_name}\nRegions: #{regions.join(', ')}"
       )
     end
 
@@ -89,7 +89,7 @@ module Pvp
     def self.characters_complete(cycle:, season_name:, elapsed_seconds: nil)
       elapsed = elapsed_seconds ? " in #{format_elapsed(elapsed_seconds)}" : ""
       logger.info("SYNC CYCLE ##{cycle.id} — characters complete#{elapsed}, running aggregations")
-      TelegramNotifier.send(
+      cycle.notify_telegram(
         "✓ <b>Characters synced#{elapsed}</b>\n" \
         "Cycle ##{cycle.id} — #{season_name}\n" \
         "#{cycle.completed_character_batches}/#{cycle.expected_character_batches} batches · aggregating…"
@@ -135,7 +135,7 @@ module Pvp
       logger.info("  Snapshot    : #{cycle.snapshot_at&.strftime('%Y-%m-%d %H:%M:%S %Z')}")
       logger.info(SEPARATOR)
       logger.info("")
-      TelegramNotifier.send(telegram_cycle_complete_message(cycle, season_name, char_line, aggregation_counts, elapsed))
+      cycle.notify_telegram(telegram_cycle_complete_message(cycle, season_name, char_line, aggregation_counts, elapsed))
     end
     # rubocop:enable Metrics/AbcSize
 

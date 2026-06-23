@@ -10,6 +10,7 @@
 #  regions                     :string           default([]), not null, is an Array
 #  snapshot_at                 :datetime         not null
 #  status                      :string           default("syncing_leaderboards"), not null
+#  telegram_message_id         :bigint
 #  created_at                  :datetime         not null
 #  updated_at                  :datetime         not null
 #  pvp_season_id               :bigint           not null
@@ -36,6 +37,18 @@ class PvpSyncCycle < ApplicationRecord
 
   def self.active
     where(status: %i[syncing_leaderboards syncing_characters]).order(created_at: :desc).first
+  end
+
+  # Posts one Telegram message per cycle, then edits that same message on every
+  # subsequent lifecycle event (start → milestones → complete) so the chat shows
+  # a single self-updating message instead of one message per step.
+  def notify_telegram(text)
+    if telegram_message_id.present?
+      TelegramNotifier.edit(telegram_message_id, text)
+    else
+      message_id = TelegramNotifier.send(text)
+      update!(telegram_message_id: message_id) if message_id
+    end
   end
 
   validates :status, presence: true
@@ -87,7 +100,7 @@ class PvpSyncCycle < ApplicationRecord
       milestone = crossed_milestone
       return unless milestone
 
-      TelegramNotifier.send(progress_milestone_message(milestone))
+      notify_telegram(progress_milestone_message(milestone))
     end
 
     def progress_milestone_message(milestone)

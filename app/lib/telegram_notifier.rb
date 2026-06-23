@@ -16,6 +16,7 @@ module TelegramNotifier
   end
 
   # Broadcast to the default TELEGRAM_CHAT_ID (job notifications).
+  # Returns the new message's Telegram message_id (Integer) on success, else nil.
   # rubocop:disable Metrics/AbcSize
   def self.send(text)
     token = ENV["TELEGRAM_BOT_TOKEN"]
@@ -23,6 +24,19 @@ module TelegramNotifier
     return unless token.present? && chat.present?
 
     post_message(token, chat, text)
+  end
+
+  # Edit an existing broadcast message in place (one self-updating message
+  # instead of a new one per update). No-ops if message_id is blank.
+  def self.edit(message_id, text)
+    token = ENV["TELEGRAM_BOT_TOKEN"]
+    chat  = ENV["TELEGRAM_CHAT_ID"]
+    return unless token.present? && chat.present? && message_id.present?
+
+    data = { chat_id: chat, message_id: message_id, text: text, parse_mode: "HTML" }
+    post_form("bot#{token}/editMessageText", data)
+  rescue StandardError => e
+    Rails.logger.error("[TelegramNotifier] edit: #{e.message}")
   end
 
   # Reply to a specific chat_id (bot commands).
@@ -65,9 +79,19 @@ module TelegramNotifier
   def self.post_message(token, chat_id, text, reply_markup: nil)
     data = { chat_id: chat_id, text: text, parse_mode: "HTML" }
     data[:reply_markup] = reply_markup.to_json if reply_markup
-    post_form("bot#{token}/sendMessage", data)
+    response = post_form("bot#{token}/sendMessage", data)
+    extract_message_id(response)
   rescue StandardError => e
     Rails.logger.error("[TelegramNotifier] #{e.message}")
+    nil
+  end
+
+  def self.extract_message_id(response)
+    return nil unless response.is_a?(Net::HTTPResponse)
+
+    JSON.parse(response.body).dig("result", "message_id")
+  rescue StandardError
+    nil
   end
 
   def self.post_document(token, chat_id, filename:, content:, caption:)
@@ -116,6 +140,6 @@ module TelegramNotifier
     parts.join("\r\n") + "\r\n--#{boundary}--"
   end
 
-  private_class_method :post_message, :post_document, :post_answer_callback,
+  private_class_method :post_message, :extract_message_id, :post_document, :post_answer_callback,
                        :post_form, :build_http, :build_multipart
 end
