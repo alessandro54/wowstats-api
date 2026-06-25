@@ -20,7 +20,7 @@
 #  index_translations_on_locale                           (locale)
 #  index_translations_on_translatable                     (translatable_type,translatable_id)
 #  index_translations_on_translatable_and_locale_and_key  (translatable_type,translatable_id,locale,key) UNIQUE
-#  translations_embedding_idx                             (embedding) USING ivfflat
+#  translations_embedding_idx                             (embedding) USING hnsw
 #
 FactoryBot.define do
   factory :translation do

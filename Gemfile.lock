@@ -84,10 +84,6 @@ GEM
     annotaterb (4.22.0)
       activerecord (>= 6.0.0)
       activesupport (>= 6.0.0)
-    anthropic (0.4.1)
-      event_stream_parser (>= 0.3.0, < 2.0.0)
-      faraday (>= 1)
-      faraday-multipart (>= 1)
     ast (2.4.3)
     async (2.39.0)
       console (~> 1.29)
@@ -418,6 +414,10 @@ GEM
     rubocop-rspec (3.9.0)
       lint_roller (~> 1.1)
       rubocop (~> 1.81)
+    ruby-anthropic (0.4.2)
+      event_stream_parser (>= 0.3.0, < 2.0.0)
+      faraday (>= 1)
+      faraday-multipart (>= 1)
     ruby-openai (8.3.0)
       event_stream_parser (>= 0.3.0, < 2.0.0)
       faraday (>= 1)
@@ -522,7 +522,6 @@ PLATFORMS
 DEPENDENCIES
   amazing_print (~> 2.0)
   annotaterb (~> 4.20)
-  anthropic (~> 0.4)
   async (~> 2.39)
   avo
   bootsnap (~> 1.19)
@@ -552,6 +551,7 @@ DEPENDENCIES
   rubocop-rails-omakase (~> 1.1)
   rubocop-rake
   rubocop-rspec
+  ruby-anthropic (~> 0.4)
   ruby-openai (~> 8.0)
   sentry-rails
   sentry-ruby

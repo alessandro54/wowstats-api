@@ -45,7 +45,7 @@ gem "solid_cache"          # Rails.cache backed by PostgreSQL
 gem "solid_queue"          # Background jobs backed by PostgreSQL
 
 # RAG pipeline
-gem "anthropic", "~> 0.4" # Claude generation (insights endpoint)
+gem "ruby-anthropic", "~> 0.4" # Claude generation (insights endpoint); `anthropic` was renamed
 gem "neighbor" # pgvector wrapper for ActiveRecord
 gem "ruby-openai", "~> 8.0" # OpenAI embeddings (text-embedding-3-small, 1536 dims)
 

@@ -13,6 +13,7 @@
 #  created_at                  :datetime         not null
 #  updated_at                  :datetime         not null
 #  pvp_season_id               :bigint           not null
+#  telegram_message_id         :bigint
 #
 # Indexes
 #
