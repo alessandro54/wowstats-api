@@ -67,8 +67,19 @@ namespace :db do
       "UPDATE ar_internal_metadata SET value = '#{Rails.env}' WHERE key = 'environment'"
     )
 
+    # The dump is at production's schema version, which lags whatever migrations
+    # exist on this branch (e.g. knowledge_document_chunks). Apply the pending
+    # ones so local matches the running code, not just production.
+    puts "→ Applying pending migrations..."
+    system("bundle exec rails db:migrate") || abort("db:migrate failed")
+
     puts "→ Ensuring queue database schema..."
     system("bundle exec rails db:schema:load:queue")
+
+    # Cache lives in a separate DB that a pull doesn't touch, so cached meta
+    # responses (incl. AI insights) now point at stale rows. Clear them.
+    puts "→ Clearing cache (stale meta/insights from previous data)..."
+    Rails.cache.clear
 
     puts "✓ Done. Local database '#{local}' now mirrors production."
   end
