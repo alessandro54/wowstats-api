@@ -12,10 +12,15 @@ env:
   IMAGE_NAME: ${{ github.repository }}
   DOKKU_APP: wow-meta
 
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build-push:
     name: Build & Push to GHCR
     runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     permissions:
       contents: read
@@ -67,10 +72,11 @@ jobs:
   deploy:
     name: Deploy to Dokku
     needs: build-push
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 15
     environment:
       name: production
-      url: https://api.wowinsights.xyz
+      url: https://api.wowstats.gg
 
     steps:
       - name: Set up SSH
@@ -86,3 +92,15 @@ jobs:
         run: |
           IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${SHA::7}"
           ssh dokku@${{ secrets.DOKKU_HOST }} git:from-image ${{ env.DOKKU_APP }} "$IMAGE"
+
+      - name: Smoke test /up
+        run: |
+          for i in $(seq 1 10); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 \
+              -H "Host: api.wowstats.gg" "http://${{ secrets.DOKKU_HOST }}/up" || true)
+            echo "attempt $i → HTTP $code"
+            [ "$code" = "200" ] && exit 0
+            sleep 6
+          done
+          echo "::error::/up did not return 200 after deploy"
+          exit 1

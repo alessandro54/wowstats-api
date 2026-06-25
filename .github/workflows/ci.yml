@@ -9,10 +9,18 @@ on:
 env:
   RAILS_ENV: test
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   lint:
     name: Lint
     runs-on: ubuntu-24.04-arm
+    timeout-minutes: 15
 
     steps:
       - name: Checkout code
@@ -34,10 +42,11 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
 
     services:
       postgres:
-        image: pgvector/pgvector:pg15
+        image: pgvector/pgvector:pg18
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: wow_bis_test
@@ -72,9 +81,10 @@ jobs:
           bundle exec rspec --format progress --color
 
       - name: Upload coverage reports
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v5
         with:
           directory: ./coverage
           flags: backend
           name: backend-coverage
+          token: ${{ secrets.CODECOV_TOKEN }}
         if: always()

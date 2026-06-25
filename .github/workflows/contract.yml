@@ -11,14 +11,22 @@ env:
   RAILS_ENV: test
   RUN_CONTRACT_TESTS: '1'
 
+permissions:
+  contents: read
+
+concurrency:
+  group: contract-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   contract:
     name: Blizzard API contract
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
 
     services:
       postgres:
-        image: postgres:15
+        image: pgvector/pgvector:pg18
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: wow_bis_test
