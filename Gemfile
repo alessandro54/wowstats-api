@@ -40,7 +40,7 @@ gem "rack-attack", "~> 6.7"
 gem "propshaft", "~> 1.3"
 
 # PostgreSQL-backed ActionCable, Rails.cache, background jobs
-gem "solid_cable", "~> 3.0" # ActionCable over PostgreSQL (pinned: 4.0 has breaking changes)
+gem "solid_cable", "~> 4.0" # ActionCable over PostgreSQL (pinned: 4.0 has breaking changes)
 gem "solid_cache"          # Rails.cache backed by PostgreSQL
 gem "solid_queue"          # Background jobs backed by PostgreSQL
 
