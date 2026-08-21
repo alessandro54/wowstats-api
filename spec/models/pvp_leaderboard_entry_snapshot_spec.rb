@@ -18,12 +18,10 @@
 #
 # Indexes
 #
-#  idx_snap_character_time                                      (character_id,snapshot_at DESC)
-#  idx_snap_leaderboard_time                                    (pvp_leaderboard_id,snapshot_at DESC)
-#  idx_snap_unique                                              (character_id,pvp_leaderboard_id,snapshot_at) UNIQUE
-#  index_pvp_leaderboard_entry_snapshots_on_character_id        (character_id)
-#  index_pvp_leaderboard_entry_snapshots_on_pvp_leaderboard_id  (pvp_leaderboard_id)
-#  index_pvp_leaderboard_entry_snapshots_on_pvp_sync_cycle_id   (pvp_sync_cycle_id)
+#  idx_snap_character_time                                     (character_id,snapshot_at DESC)
+#  idx_snap_leaderboard_time                                   (pvp_leaderboard_id,snapshot_at DESC)
+#  idx_snap_unique                                             (character_id,pvp_leaderboard_id,snapshot_at) UNIQUE
+#  index_pvp_leaderboard_entry_snapshots_on_pvp_sync_cycle_id  (pvp_sync_cycle_id)
 #
 # Foreign Keys
 #

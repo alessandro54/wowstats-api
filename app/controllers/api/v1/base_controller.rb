@@ -58,11 +58,10 @@ class Api::V1::BaseController < ApplicationController
       "pvp_meta/v#{version}/#{segments.compact.join("/")}"
     end
 
-    # Wraps Rails.cache.fetch but skips caching entirely in development
-    # so controllers always return fresh data.
+    # Wraps Rails.cache.fetch. Dev uses Solid Cache (config/cache.yml +
+    # the dev `cache` database), so meta responses cache in dev too — bump
+    # META_CACHE_VERSION_KEY or clear the cache DB to force regeneration.
     def meta_cache_fetch(cache_key, expires_in: META_CACHE_TTL, &block)
-      return yield if Rails.env.development?
-
       Rails.cache.fetch(cache_key, expires_in: expires_in, &block)
     end
 

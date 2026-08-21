@@ -13,7 +13,7 @@ production:
   sync_pvp_leaderboards:
     class: Pvp::SyncCurrentSeasonLeaderboardsJob
     queue: default
-    schedule: every 6 hours
+    schedule: "0 9 * * *" # 04:00 UTC-5
 
   sync_talent_trees:
     class: SyncTalentTreesJob

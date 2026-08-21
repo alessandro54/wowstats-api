@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_17_030000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_24_000200) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -118,6 +118,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_17_030000) do
     t.index ["success"], name: "index_job_performance_metrics_on_success"
   end
 
+  create_table "knowledge_document_chunks", force: :cascade do |t|
+    t.integer "chunk_index", null: false
+    t.text "content", null: false
+    t.datetime "created_at", null: false
+    t.vector "embedding", limit: 1536
+    t.bigint "knowledge_document_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["embedding"], name: "knowledge_document_chunks_embedding_idx", opclass: :vector_cosine_ops, using: :hnsw
+    t.index ["knowledge_document_id", "chunk_index"], name: "idx_kd_chunks_on_doc_and_index", unique: true
+  end
+
   create_table "knowledge_documents", force: :cascade do |t|
     t.string "category"
     t.text "content"
@@ -132,7 +143,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_17_030000) do
     t.string "title", null: false
     t.datetime "updated_at", null: false
     t.string "url", null: false
-    t.index ["embedding"], name: "knowledge_documents_embedding_idx", opclass: :vector_cosine_ops, using: :ivfflat
+    t.index ["embedding"], name: "knowledge_documents_embedding_idx", opclass: :vector_cosine_ops, using: :hnsw
     t.index ["external_updated_at"], name: "index_knowledge_documents_on_external_updated_at"
     t.index ["fetched_at"], name: "index_knowledge_documents_on_fetched_at"
     t.index ["source", "external_id"], name: "index_knowledge_documents_on_source_and_external_id", unique: true
@@ -188,9 +199,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_17_030000) do
     t.integer "wins", null: false
     t.index ["character_id", "pvp_leaderboard_id", "snapshot_at"], name: "idx_snap_unique", unique: true
     t.index ["character_id", "snapshot_at"], name: "idx_snap_character_time", order: { snapshot_at: :desc }
-    t.index ["character_id"], name: "index_pvp_leaderboard_entry_snapshots_on_character_id"
     t.index ["pvp_leaderboard_id", "snapshot_at"], name: "idx_snap_leaderboard_time", order: { snapshot_at: :desc }
-    t.index ["pvp_leaderboard_id"], name: "index_pvp_leaderboard_entry_snapshots_on_pvp_leaderboard_id"
     t.index ["pvp_sync_cycle_id"], name: "index_pvp_leaderboard_entry_snapshots_on_pvp_sync_cycle_id"
   end
 
@@ -316,6 +325,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_17_030000) do
     t.string "regions", default: [], null: false, array: true
     t.datetime "snapshot_at", null: false
     t.string "status", default: "syncing_leaderboards", null: false
+    t.bigint "telegram_message_id"
     t.datetime "updated_at", null: false
     t.index ["pvp_season_id", "status"], name: "index_pvp_sync_cycles_on_pvp_season_id_and_status"
     t.index ["pvp_season_id"], name: "index_pvp_sync_cycles_on_pvp_season_id"
@@ -383,7 +393,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_17_030000) do
     t.string "translatable_type", null: false
     t.datetime "updated_at", null: false
     t.text "value", null: false
-    t.index ["embedding"], name: "translations_embedding_idx", opclass: :vector_cosine_ops, using: :ivfflat
+    t.index ["embedding"], name: "translations_embedding_idx", opclass: :vector_cosine_ops, using: :hnsw
     t.index ["key"], name: "index_translations_on_key"
     t.index ["locale"], name: "index_translations_on_locale"
     t.index ["translatable_type", "translatable_id", "locale", "key"], name: "index_translations_on_translatable_and_locale_and_key", unique: true
@@ -396,6 +406,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_17_030000) do
   add_foreign_key "character_items", "items", column: "enchantment_source_item_id"
   add_foreign_key "character_talents", "characters"
   add_foreign_key "character_talents", "talents"
+  add_foreign_key "knowledge_document_chunks", "knowledge_documents"
   add_foreign_key "pvp_leaderboard_entries", "characters"
   add_foreign_key "pvp_leaderboard_entries", "pvp_leaderboards"
   add_foreign_key "pvp_leaderboard_entry_snapshots", "characters"

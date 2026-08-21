@@ -1,11 +1,24 @@
+name: wow-stats
+
 services:
   db:
-    image: postgres:17
+    # pgvector/pgvector:pg18 matches production's PG 18 and ships the `vector`
+    # extension with HNSW, so the embedding migrations and the prod dump
+    # (which CREATE EXTENSION vector) restore cleanly. Multi-arch image: Docker
+    # pulls linux/arm64 natively on Apple Silicon / OCI Ampere; platform is
+    # pinned so an amd64 daemon can't silently emulate the wrong arch.
+    image: pgvector/pgvector:pg18
+    platform: linux/arm64
+    # PG18 images store data in a major-version subdir, so the volume mounts at
+    # /var/lib/postgresql (not /data) — see docker-library/postgres#1259.
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
+    # DB_POOL defaults to 130; raise max_connections above it so dev sync
+    # jobs don't exhaust the server.
+    command: postgres -c max_connections=200
     ports:
       - "5432:5432"
     healthcheck:

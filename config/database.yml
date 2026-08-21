@@ -39,6 +39,11 @@ development:
     database: wow_bis_development_queue
     migrations_paths: db/queue_migrate
     pool: <%= ENV.fetch("DB_POOL", 130) %>
+  cache:
+    <<: *default
+    database: wow_bis_development_cache
+    migrations_paths: db/cache_migrate
+    pool: <%= ENV.fetch("DB_POOL", 130) %>
 
   # The specified database role being used to connect to PostgreSQL.
   # To create additional roles in PostgreSQL see `$ createuser --help`.

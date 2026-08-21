@@ -10,10 +10,10 @@
 #  regions                     :string           default([]), not null, is an Array
 #  snapshot_at                 :datetime         not null
 #  status                      :string           default("syncing_leaderboards"), not null
-#  telegram_message_id         :bigint
 #  created_at                  :datetime         not null
 #  updated_at                  :datetime         not null
 #  pvp_season_id               :bigint           not null
+#  telegram_message_id         :bigint
 #
 # Indexes
 #
