@@ -86,6 +86,14 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H ${{ secrets.DOKKU_HOST }} >> ~/.ssh/known_hosts
 
+      - name: Enforce worker resource limits
+        run: |
+          # Host has 2 CPUs; docker rejects --cpus above that. Keep this in sync
+          # with the box or the worker process silently fails to start.
+          ssh dokku@${{ secrets.DOKKU_HOST }} resource:limit \
+            --process-type worker --cpu 1.5 --memory 7000 ${{ env.DOKKU_APP }}
+          ssh dokku@${{ secrets.DOKKU_HOST }} resource:report ${{ env.DOKKU_APP }}
+
       - name: Deploy image to Dokku
         env:
           SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
