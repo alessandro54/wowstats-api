@@ -191,7 +191,7 @@ Multi-database Rails setup:
 
 | Job | Schedule | Purpose |
 |---|---|---|
-| `Pvp::SyncCurrentSeasonLeaderboardsJob` | Every 6 hours | Full leaderboard + character sync |
+| `Pvp::SyncCurrentSeasonLeaderboardsJob` | Daily at 09:00 UTC (04:00 UTC-5) | Full leaderboard + character sync |
 | `EnsureMetaTranslationsJob` | Every 12 hours | Ensure all meta items/enchants/talents have i18n |
 | `clear_solid_queue_finished_jobs` | Every hour at :12 | Prune finished job records |
 | `Pvp::DetectStaleCycleJob` | Every 30 minutes | Alert if a cycle is stuck for >2h |
